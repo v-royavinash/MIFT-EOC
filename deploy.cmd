@@ -75,16 +75,6 @@ echo Restoring npm packages for tabs folder (this can take several minutes)
 echo "%DEPLOYMENT_SOURCE%\EOC-TeamsFx\tabs"
 pushd "%DEPLOYMENT_SOURCE%\EOC-TeamsFx\tabs"
 
-
-:: 1. Install the npx command
-call :ExecuteCmd npm install -g npx
-IF !ERRORLEVEL! NEQ 0 (
-    echo First attempt failed, retrying once
-    call :ExecuteCmd npm install -g npx
-)
-popd
-IF !ERRORLEVEL! NEQ 0 goto error
-
 :: 2. Install the npm packages
 call :ExecuteCmd npm install --no-audit
 IF !ERRORLEVEL! NEQ 0 (
