@@ -15,6 +15,7 @@ import "../scss/EOCHome.module.scss";
 import * as microsoftTeams from "@microsoft/teams-js";
 import LocalizedStrings from 'react-localization';
 import { localizedStrings } from "../locale/LocaleStrings";
+import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 initializeIcons();
 
@@ -53,6 +54,14 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
         // create graph client without asking for login based on previous sessions
         const credential = new TeamsUserCredential();
         const graph = createMicrosoftGraphClient(credential, scope);
+        
+        const appInsights = new ApplicationInsights({
+        config: {
+            instrumentationKey:  process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY
+        }
+});
+
+                appInsights.loadAppInsights();
 
         this.state = {
             showLoginPage: true,
@@ -235,11 +244,13 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
     }
 
     public render() {
+
         // let localeStrings = new LocalizedStrings(localizedStrings);
         if (this.state.locale && this.state.locale !== "") {
             localeStrings.setLanguage(this.state.locale);
         }
-
+        appInsights.trackTrace({ message: "EOCHome" });
+        
         return (
             <>
             {this.state.locale === "" ?
