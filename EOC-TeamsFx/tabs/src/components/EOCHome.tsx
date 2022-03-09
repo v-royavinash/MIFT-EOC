@@ -19,6 +19,14 @@ import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 initializeIcons();
 
+const appInsights = new ApplicationInsights({
+        config: {
+            instrumentationKey:  process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY
+        }
+});
+
+appInsights.loadAppInsights();
+
 interface IEOCHomeState {
     showLoginPage: boolean;
     graph: Client;
@@ -55,14 +63,6 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
         const credential = new TeamsUserCredential();
         const graph = createMicrosoftGraphClient(credential, scope);
         
-        const appInsights = new ApplicationInsights({
-        config: {
-            instrumentationKey:  process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY
-        }
-});
-
-                appInsights.loadAppInsights();
-
         this.state = {
             showLoginPage: true,
             graph: graph,
