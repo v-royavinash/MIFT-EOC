@@ -18,7 +18,7 @@ import { localizedStrings } from "../locale/LocaleStrings";
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 initializeIcons();
-
+//initialize App Insights
 const appInsights = new ApplicationInsights({
         config: {
             instrumentationKey:  process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY
