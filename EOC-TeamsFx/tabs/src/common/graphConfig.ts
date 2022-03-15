@@ -20,6 +20,9 @@ export const assessmentTabTeamsAppIdGraphEndpoint = "https://graph.microsoft.com
 export const allAppsGraphEndpoint = "/appCatalogs/teamsApps?$filter=distributionMethod eq 'organization'";
 export const betaGraphEndpoint = "https://graph.microsoft.com/beta/teams/";
 export const tagsGraphEndpoint = "/tags";
+export const membersGraphEndpoint = "/members";
+export const addMembersGraphEndpoint = "/members/add";
+export const addUsersGraphEndpoint = "https://graph.microsoft.com/v1.0/users";
 export const scope = [
     "User.Read",
     "User.ReadBasic.All",
@@ -31,6 +34,8 @@ export const scope = [
     "GroupMember.Read.All",
     "Group.Read.All",
     "Group.ReadWrite.All",
+    "TeamMember.Read.All",
+    "TeamMember.ReadWrite.All",
     "Directory.ReadWrite.All",
     "Directory.AccessAsUser.All",
     "TeamsTab.Create",

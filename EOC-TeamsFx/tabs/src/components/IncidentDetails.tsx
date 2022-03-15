@@ -7,19 +7,21 @@ import * as React from "react";
 import Col from "react-bootstrap/Col";
 import Row from "react-bootstrap/Row";
 import { v4 as uuidv4 } from "uuid";
-import CommonService from "../common/CommonService";
+import CommonService, { IListItem } from "../common/CommonService";
 import * as constants from '../common/Constants';
 import * as graphConfig from '../common/graphConfig';
 import siteConfig from '../config/siteConfig.json';
 import '../scss/IncidentDetails.module.scss';
 import {
-    ChannelCreationResult, ChannelCreationStatus, CreateIncidentEntity,
+    ChannelCreationResult, ChannelCreationStatus, IncidentEntity,
     IInputValidationStates, ITeamChannel, ITeamCreatedResponse,
-    RoleAssignments
+    RoleAssignments,
+    UserDetails
 } from "./ICreateIncident";
 import { IInputRegexValidationStates } from '../common/CommonService';
 import { ITooltipHostStyles, TooltipHost } from "@fluentui/react/lib/Tooltip";
 import { Icon } from "@fluentui/react/lib/Icon";
+import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 const calloutProps = { gapSpace: 0 };
 
@@ -34,11 +36,14 @@ export interface IIncidentDetailsProps {
     hideMessageBar(): void;
     localeStrings: any;
     currentUserId: string;
+    incidentData?: IListItem;
+    appInsights: ApplicationInsights;
+    userPrincipalName: any;
 }
 
 export interface IIncidentDetailsState {
     dropdownOptions: any;
-    createIncDetailsItem: CreateIncidentEntity;
+    incDetailsItem: IncidentEntity;
     newRoleString: string;
     roleAssignments: RoleAssignments[];
     showLoader: boolean;
@@ -50,7 +55,14 @@ export interface IIncidentDetailsState {
     isDesktop: boolean;
     formOpacity: number;
     eocAppId: string;
-    selectedUsers: any
+    selectedUsers: any;
+    incidentTypeSearchQuery: string;
+    isEditMode: boolean;
+    selectedIncidentCommander: any;
+    isRoleInEditMode: boolean[];
+    selectedUsersInEditMode: any;
+    teamGroupId: string;
+    existingRolesMembers: any;
 }
 
 // sets the initial values for required fields validation object
@@ -71,7 +83,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
         super(props);
         this.state = {
             dropdownOptions: '',
-            createIncDetailsItem: new CreateIncidentEntity(),
+            incDetailsItem: new IncidentEntity(),
             newRoleString: '',
             roleAssignments: [],
             showLoader: true,
@@ -83,7 +95,14 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
             isDesktop: true,
             formOpacity: 0.5,
             eocAppId: "",
-            selectedUsers: []
+            selectedUsers: [],
+            incidentTypeSearchQuery: "",
+            isEditMode: false,
+            selectedIncidentCommander: [],
+            isRoleInEditMode: [],
+            selectedUsersInEditMode: [],
+            teamGroupId: "",
+            existingRolesMembers: []
         };
         this.onRoleChange = this.onRoleChange.bind(this);
         this.onTextInputChange = this.onTextInputChange.bind(this);
@@ -109,10 +128,13 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
     private graphEndpoint = "";
 
     public async componentDidMount() {
-        this.getDropdownOptions();
+        await this.getDropdownOptions();
         //Event listener for screen resizing
         window.addEventListener("resize", this.resize.bind(this));
         this.resize();
+
+        // check if form is in edit mode
+        this.checkIfEditMode();
     }
 
     //Function for screen Resizing
@@ -138,12 +160,18 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
             await Promise.all([statusOptionsPromise, typeOptionsPromise, roleOptionsPromise])
                 .then(([statusOptions, typeOptions, roleOptions]) => {
                     const optionsArr: any = [];
-                    // remove "Closed" status from options
-                    optionsArr.statusOptions = statusOptions.filter((status: string) => status !== constants.closed);
+                    // remove "Closed" status from options if form is New Form
+                    if (!(this.props.incidentData && this.props.incidentData.incidentId)) {
+                        optionsArr.statusOptions = statusOptions.filter((status: string) => status !== constants.closed);
+                    }
+                    else {
+                        optionsArr.statusOptions = statusOptions
+                    }
+
                     optionsArr.typeOptions = typeOptions.sort();
                     optionsArr.roleOptions = roleOptions.sort();
 
-                    let incInfo = { ...this.state.createIncDetailsItem };
+                    let incInfo = { ...this.state.incDetailsItem };
                     let inputValidationObj = this.state.inputValidation;
                     if (incInfo) {
                         if (incInfo) {
@@ -155,7 +183,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     this.setState({
                         dropdownOptions: optionsArr,
                         showLoader: false,
-                        createIncDetailsItem: incInfo,
+                        incDetailsItem: incInfo,
                         inputValidation: inputValidationObj,
                         formOpacity: 1
                     })
@@ -171,16 +199,97 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 constants.errorLogPrefix + "CreateIncident_GetDropdownOptions \n",
                 JSON.stringify(error)
             );
+            // Log Exception
+            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_GetDropdownOptions', this.props.userPrincipalName);
+        }
+    }
+
+    // check if the form is in edit mode and set the data object if in edit mode
+    checkIfEditMode = () => {
+        // if the object has data, the form is in edit mode
+        if (this.props.incidentData && this.props.incidentData.incidentId) {
+
+            const incCommanderObj: UserDetails = {
+                userName: this.props.incidentData.incidentCommanderObj ? this.props.incidentData.incidentCommanderObj.split('|')[0] : "",
+                userEmail: this.props.incidentData.incidentCommanderObj ? this.props.incidentData.incidentCommanderObj.split('|')[2] : "",
+                userId: this.props.incidentData.incidentCommanderObj ? this.props.incidentData.incidentCommanderObj.split('|')[1] : ""
+            }
+
+            const selectedIncCommander: any = {
+                displayName: this.props.incidentData.incidentCommanderObj ? this.props.incidentData.incidentCommanderObj.split('|')[0] : "",
+                userPrincipalName: this.props.incidentData.incidentCommanderObj ? this.props.incidentData.incidentCommanderObj.split('|')[2] : "",
+                id: this.props.incidentData.incidentCommanderObj ? this.props.incidentData.incidentCommanderObj.split('|')[1] : ""
+            }
+            let incInfo = { ...this.state.incDetailsItem };
+            incInfo.incidentId = this.props.incidentData.incidentId.toString();
+            incInfo.incidentName = this.props.incidentData.incidentName ? this.props.incidentData.incidentName : '';
+            incInfo.incidentType = this.props.incidentData.incidentType ? this.props.incidentData.incidentType : '';
+            incInfo.startDateTime = this.props.incidentData.startDate ? this.props.incidentData.startDate : '';
+            incInfo.incidentStatus = this.props.incidentData.status ? this.props.incidentData.status : '';
+            incInfo.incidentCommander = incCommanderObj;
+            incInfo.location = this.props.incidentData.location ? this.props.incidentData.location : '';
+            incInfo.incidentDesc = this.props.incidentData.incidentDescription ? this.props.incidentData.incidentDescription : '';
+
+            const rolesObj: any[] = [];
+            const isRoleInEditMode: boolean[] = [];
+            const roleAssignments = this.props.incidentData.roleAssignments ? this.props.incidentData.roleAssignments : '';
+
+            if (roleAssignments.length > 0 && roleAssignments.split(";").length > 1) {
+                roleAssignments.split(";").forEach(role => {
+                    if (role.length > 0) {
+                        let userNamesStr = "";
+                        isRoleInEditMode.push(false);
+                        const userDetailsObj: any[] = [];
+                        role.split(":")[1].trim().split(",").forEach(user => {
+                            userNamesStr += user.split("|")[0].trim() + ", ";
+                            userDetailsObj.push({
+                                userName: user.split("|")[0].trim(),
+                                userEmail: user.split("|")[2].trim(),
+                                userId: user.split("|")[1].trim(),
+                            });
+                        });
+                        userNamesStr = userNamesStr.trim();
+                        userNamesStr = userNamesStr.slice(0, -1);
+
+                        rolesObj.push({
+                            role: role.split(":")[0].trim(),
+                            userNamesString: userNamesStr,
+                            userObjString: role.split(":")[1].trim(),
+                            userDetailsObj: userDetailsObj
+                        })
+                    }
+                });
+            }
+
+            const teamWebURL = this.props.incidentData.teamWebURL ? this.props.incidentData.teamWebURL : '';
+            const teamGroupId = teamWebURL.split("?")[1].split("&")[0].split("=")[1].trim();
+
+            this.setState({
+                incDetailsItem: incInfo,
+                selectedIncidentCommander: [selectedIncCommander],
+                roleAssignments: rolesObj,
+                existingRolesMembers: rolesObj,
+                isRoleInEditMode: isRoleInEditMode,
+                teamGroupId: teamGroupId,
+                isEditMode: true,
+                incidentTypeSearchQuery: this.props.incidentData.incidentType ? this.props.incidentData.incidentType : ''
+            })
         }
     }
 
     // on incident commander change
     private handleIncCommanderChange = (selectedValue: any) => {
-        let incInfo = { ...this.state.createIncDetailsItem };
+        let incInfo = { ...this.state.incDetailsItem };
         if (incInfo) {
             let inputValidationObj = this.state.inputValidation;
+            const selctedIncCommander = [];
             if (selectedValue.detail.length > 0) {
                 inputValidationObj.incidentCommandarHasError = false;
+                selctedIncCommander.push({
+                    displayName: selectedValue.detail[0] ? selectedValue.detail[0].displayName : '',
+                    userPrincipalName: selectedValue.detail[0] ? selectedValue.detail[0].userPrincipalName : '',
+                    id: selectedValue.detail[0] ? selectedValue.detail[0].id : ''
+                })
             }
             else {
                 inputValidationObj.incidentCommandarHasError = true;
@@ -191,13 +300,18 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 userEmail: selectedValue.detail[0] ? selectedValue.detail[0].userPrincipalName : '',
                 userId: selectedValue.detail[0] ? selectedValue.detail[0].id : ''
             }
-            this.setState({ createIncDetailsItem: incInfo, inputValidation: inputValidationObj });
+
+            this.setState({
+                incDetailsItem: incInfo,
+                selectedIncidentCommander: selctedIncCommander,
+                inputValidation: inputValidationObj
+            });
         }
     };
 
     // on change handler for text input changes
     private onTextInputChange = (event: any, key: string) => {
-        let incInfo = { ...this.state.createIncDetailsItem };
+        let incInfo = { ...this.state.incDetailsItem };
         let inputValidationObj = this.state.inputValidation;
         let regexValidationObj = this.state.inputRegexValidation;
         if (incInfo) {
@@ -211,7 +325,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         inputValidationObj.incidentNameHasError = true;
                     }
                     this.setState({
-                        createIncDetailsItem: incInfo,
+                        incDetailsItem: incInfo,
                         inputValidation: inputValidationObj
                     })
                     break;
@@ -223,7 +337,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     else {
                         inputValidationObj.incidentStartDateTimeHasError = true;
                     }
-                    this.setState({ createIncDetailsItem: incInfo, inputValidation: inputValidationObj })
+                    this.setState({ incDetailsItem: incInfo, inputValidation: inputValidationObj })
                     break;
                 case "location":
                     incInfo[key] = event.target.value;
@@ -236,13 +350,13 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         inputValidationObj.incidentLocationHasError = true;
                     }
                     this.setState({
-                        createIncDetailsItem: incInfo,
+                        incDetailsItem: incInfo,
                         inputValidation: inputValidationObj
                     })
                     break;
                 case "assignedUser":
                     incInfo[key] = event.target.value;
-                    this.setState({ createIncDetailsItem: incInfo });
+                    this.setState({ incDetailsItem: incInfo });
                     break;
                 case "incidentDesc":
                     incInfo[key] = event.target.value;
@@ -252,7 +366,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     else {
                         inputValidationObj.incidentDescriptionHasError = true;
                     }
-                    this.setState({ createIncDetailsItem: incInfo, inputValidation: inputValidationObj })
+                    this.setState({ incDetailsItem: incInfo, inputValidation: inputValidationObj })
                     break;
 
                 default:
@@ -272,47 +386,51 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
 
     // on incident type dropdown value change
     private onIncidentTypeChange = (event: any, selectedValue: any) => {
-        let incInfo = this.state.createIncDetailsItem;
+        let incInfo = this.state.incDetailsItem;
         if (incInfo) {
-            let incInfo = { ...this.state.createIncDetailsItem };
+            let incInfo = { ...this.state.incDetailsItem };
             if (incInfo) {
                 incInfo["incidentType"] = selectedValue.value;
                 let inputValidationObj = this.state.inputValidation;
                 inputValidationObj.incidentTypeHasError = false;
-                this.setState({ createIncDetailsItem: incInfo, inputValidation: inputValidationObj })
+                this.setState({ incDetailsItem: incInfo, inputValidation: inputValidationObj })
             }
         }
     }
 
+    // on incident type dropdown value change
+    private onSearchQueryChange = (event: any, data: any) => {
+        this.setState({ incidentTypeSearchQuery: data.searchQuery });
+    }
+
     // on incident status dropdown value change
     private onIncidentStatusChange = (event: any, selectedValue: any) => {
-        let incInfo = this.state.createIncDetailsItem;
+        let incInfo = this.state.incDetailsItem;
         if (incInfo) {
-            let incInfo = { ...this.state.createIncDetailsItem };
+            let incInfo = { ...this.state.incDetailsItem };
             if (incInfo) {
                 incInfo["incidentStatus"] = selectedValue.value;
                 let inputValidationObj = this.state.inputValidation;
                 inputValidationObj.incidentStatusHasError = false;
-                this.setState({ createIncDetailsItem: incInfo, inputValidation: inputValidationObj })
+                this.setState({ incDetailsItem: incInfo, inputValidation: inputValidationObj })
             }
         }
     }
 
     // on role dropdown value change
     private onRoleChange = (event: any, selectedRole: any) => {
-        let incInfo = this.state.createIncDetailsItem;
+        let incInfo = this.state.incDetailsItem;
         if (incInfo) {
-            let incInfo = { ...this.state.createIncDetailsItem };
+            let incInfo = { ...this.state.incDetailsItem };
             if (incInfo) {
                 incInfo["selectedRole"] = selectedRole.value;
-                this.setState({ createIncDetailsItem: incInfo }, (() => this.checkAddRoleBtnState()))
+                this.setState({ incDetailsItem: incInfo }, (() => this.checkAddRoleBtnState()))
             }
         }
     }
 
     // connect with service to create new role in Role Assignments list
     private addNewRole = async () => {
-
         this.setState({
             showLoader: true,
             formOpacity: 0.5
@@ -334,13 +452,13 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 const arr: any = { ...this.state.dropdownOptions };
                 arr["roleOptions"].push(this.state.newRoleString);
 
-                let incInfo = this.state.createIncDetailsItem;
+                let incInfo = this.state.incDetailsItem;
                 if (incInfo) {
-                    let incInfo = { ...this.state.createIncDetailsItem };
+                    let incInfo = { ...this.state.incDetailsItem };
                     if (incInfo) {
                         incInfo["selectedRole"] = this.state.newRoleString;
                         this.setState({
-                            createIncDetailsItem: incInfo, newRoleString: "", showLoader: false,
+                            incDetailsItem: incInfo, newRoleString: "", showLoader: false,
                             formOpacity: 1
                         })
                         this.props.showMessageBar(this.props.localeStrings.addRoleSuccessMessage, "success");
@@ -364,12 +482,15 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 constants.errorLogPrefix + "CreateIncident_AddNewRole \n",
                 JSON.stringify(error)
             );
+            // Log Exception
+            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_AddNewRole', this.props.userPrincipalName);
+
         }
     }
 
     // on assigned user change
     private handleAssignedUserChange = (selectedValue: any) => {
-        let incInfo = { ...this.state.createIncDetailsItem };
+        let incInfo = { ...this.state.incDetailsItem };
         const selectedUsersArr: any = [];
         if (incInfo) {
             incInfo["assignedUser"] = selectedValue.detail.map((user: any) => {
@@ -385,7 +506,30 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 }
             });
 
-            this.setState({ createIncDetailsItem: incInfo, selectedUsers: selectedUsersArr });
+            this.setState({ incDetailsItem: incInfo, selectedUsers: selectedUsersArr });
+            this.checkAddRoleBtnState();
+        }
+    };
+
+    // on assigned user change
+    private handleAssignedUserChangeInEditMode = (selectedValue: any) => {
+        let incInfo = { ...this.state.incDetailsItem };
+        const selectedUsersArr: any = [];
+        if (incInfo) {
+            incInfo["assignedUser"] = selectedValue.detail.map((user: any) => {
+                selectedUsersArr.push({
+                    displayName: user.displayName,
+                    userPrincipalName: user.userPrincipalName,
+                    id: user.id
+                });
+                return {
+                    "userName": user ? user.displayName : "",
+                    "userEmail": user ? user.userPrincipalName : "",
+                    "userId": user ? user.id : "",
+                }
+            });
+
+            this.setState({ incDetailsItem: incInfo, selectedUsersInEditMode: selectedUsersArr });
             this.checkAddRoleBtnState();
         }
     };
@@ -395,9 +539,11 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
         let roleAssignment = [...this.state.roleAssignments];
         let userDetailsObj: any = [];
         let userNameString = "";
+        let userObjString = "";
         // push roles into array to create role object
-        this.state.createIncDetailsItem.assignedUser.forEach(assignedUser => {
+        this.state.incDetailsItem.assignedUser.forEach(assignedUser => {
             userNameString += assignedUser.userName + ", ";
+            userObjString += assignedUser.userName + "|" + assignedUser.userId + "|" + assignedUser.userEmail + ", ";
             userDetailsObj.push({
                 userName: assignedUser.userName,
                 userEmail: assignedUser.userEmail,
@@ -407,20 +553,28 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
         userNameString = userNameString.trim();
         userNameString = userNameString.slice(0, -1);
 
+        userObjString = userObjString.trim();
+        userObjString = userObjString.slice(0, -1);
+
         roleAssignment.push({
-            role: this.state.createIncDetailsItem.selectedRole,
+            role: this.state.incDetailsItem.selectedRole,
             userNamesString: userNameString,
+            userObjString: userObjString,
             userDetailsObj: userDetailsObj
         })
 
+        const isRoleInEditMode = [...this.state.isRoleInEditMode];
+        isRoleInEditMode.push(false);
+
         // clear roles control values
-        let incInfo = this.state.createIncDetailsItem;
+        let incInfo = this.state.incDetailsItem;
         if (incInfo) {
-            let incInfo = { ...this.state.createIncDetailsItem };
+            let incInfo = { ...this.state.incDetailsItem };
             if (incInfo) {
                 incInfo["selectedRole"] = "";
                 this.setState({
-                    roleAssignments: roleAssignment, createIncDetailsItem: incInfo,
+                    roleAssignments: roleAssignment, incDetailsItem: incInfo,
+                    isRoleInEditMode: isRoleInEditMode,
                     selectedUsers: [],
                     isAddRoleAssignmentBtnDisabled: true
                 })
@@ -430,7 +584,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
 
     // change add role assignment button disable state
     private checkAddRoleBtnState = () => {
-        if (this.state.createIncDetailsItem.selectedRole !== "" &&
+        if (this.state.incDetailsItem.selectedRole !== "" &&
             this.state.selectedUsers && this.state.selectedUsers.length > 0) {
             this.setState({
                 isAddRoleAssignmentBtnDisabled: false
@@ -445,16 +599,94 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
 
     // delete added role from RoleAssignment object
     private deleteRoleItem = (itemIndex: number) => {
-        let assignments = [...this.state.roleAssignments];
+        const assignments = [...this.state.roleAssignments];
         assignments.splice(itemIndex, 1);
-        this.setState({ roleAssignments: assignments });
+
+        const isRoleInEditMode = [...this.state.isRoleInEditMode];
+        isRoleInEditMode.splice(itemIndex, 1);
+
+        this.setState({ roleAssignments: assignments, isRoleInEditMode: isRoleInEditMode });
+    }
+
+    // edit added users from RoleAssignment object
+    private editRoleItem = (itemIndex: number) => {
+        const isRoleInEditMode = [...this.state.isRoleInEditMode];
+        isRoleInEditMode.forEach((editMode, index) => {
+            if (index === itemIndex) {
+                isRoleInEditMode[itemIndex] = true;
+            }
+            else {
+                isRoleInEditMode[index] = false;
+            }
+
+        });
+        const roles = [...this.state.roleAssignments];
+        const selectedUserInRole: any = [];
+        roles[itemIndex].userDetailsObj.forEach(user => {
+            selectedUserInRole.push({
+                displayName: user.userName,
+                userPrincipalName: user.userEmail,
+                id: user.userId
+            });
+        });
+
+        this.setState({ isRoleInEditMode: isRoleInEditMode, selectedUsersInEditMode: selectedUserInRole });
+    }
+
+    // exit from edit mode in roles
+    private exitEditModeForRoles = (itemIndex: number) => {
+        const isRoleInEditMode = [...this.state.isRoleInEditMode];
+        isRoleInEditMode[itemIndex] = false;
+
+        this.setState({ isRoleInEditMode: isRoleInEditMode });
+    }
+
+    // update the role assignment array
+    private updateRoleAssignment = (index: number) => {
+        let roleAssignment = [...this.state.roleAssignments];
+        let userDetailsObj: any = [];
+        let userNameString = "";
+        let userObjString = "";
+
+        // loop throught updated user object        
+        this.state.selectedUsersInEditMode.forEach((users: any) => {
+            userNameString += users.displayName + ", ";
+            userObjString += users.displayName + "|" + users.id + "|" + users.userPrincipalName + ", ";
+            userDetailsObj.push({
+                userName: users.displayName,
+                userEmail: users.userPrincipalName,
+                userId: users.id,
+            });
+        });
+
+        userNameString = userNameString.trim();
+        userNameString = userNameString.slice(0, -1);
+
+        userObjString = userObjString.trim();
+        userObjString = userObjString.slice(0, -1);
+
+        roleAssignment[index] = {
+            role: roleAssignment[index].role,
+            userNamesString: userNameString,
+            userObjString: userObjString,
+            userDetailsObj: userDetailsObj
+        }
+
+        const isRoleInEditMode = [...this.state.isRoleInEditMode];
+        isRoleInEditMode[index] = false;
+
+        this.setState({
+            roleAssignments: roleAssignment,
+            isRoleInEditMode: isRoleInEditMode,
+            selectedUsersInEditMode: [],
+        })
     }
 
     // create new entry in incident transaction list
     private createNewIncident = async () => {
         this.scrollToTop();
         // incident info object
-        let incidentInfo: CreateIncidentEntity = this.state.createIncDetailsItem;
+        let incidentInfo: IncidentEntity = this.state.incDetailsItem;
         this.props.hideMessageBar();
         this.setState({
             showLoader: true,
@@ -502,7 +734,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                             // incident transaction list in string format
                             let roleAssignment = "";
                             this.state.roleAssignments.forEach(roles => {
-                                roleAssignment += roles.role + " - " + roles.userNamesString + "; ";
+                                roleAssignment += roles.role + " : " + roles.userObjString + "; ";
                             });
 
                             // create object to be passed in graph query
@@ -517,7 +749,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                     Location: incidentInfo.location,
                                     IncidentName: incidentInfo.incidentName,
                                     RoleAssignment: roleAssignment.trim(),
-                                    IncidentCommander: incidentInfo.incidentCommander.userName
+                                    IncidentCommander: incidentInfo.incidentCommander.userName + "|" + incidentInfo.incidentCommander.userId + "|" + incidentInfo.incidentCommander.userEmail + ";"
                                 }
                             }
 
@@ -528,18 +760,24 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                             // check if incident is created
                             if (incidentAdded) {
                                 console.log(constants.infoLogPrefix + "Incident Created");
+                                //log trace
+                                this.dataService.trackTrace(this.props.appInsights, 'Incident Created ', incidentAdded.id, this.props.userPrincipalName);
                                 try {
                                     // call method to update the incident id with custom value
                                     const incUpdated = await this.updatedIncidentId(incidentAdded.id);
 
                                     if (incUpdated) {
                                         console.log(constants.infoLogPrefix + "Incident Id Updated");
+                                        //log trace
+                                        this.dataService.trackTrace(this.props.appInsights, 'Incident Id Updated', incidentAdded.id, this.props.userPrincipalName);
                                         // call the wrapper method to perform Teams related operations
                                         await this.createTeamAndChannels(incUpdated.IncidentId, incidentAdded.id);
                                     }
                                     else {
                                         // delete the incident if incident id updation fails
                                         await this.deleteIncident(incidentAdded.id);
+                                        //log trace
+                                        this.dataService.trackTrace(this.props.appInsights, 'Incident Id Update Failed', incidentAdded.id, this.props.userPrincipalName);
                                         this.setState({
                                             showLoader: false,
                                             formOpacity: 1
@@ -551,6 +789,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                         constants.errorLogPrefix + "CreateIncident_CreateNewIncident \n",
                                         JSON.stringify(error)
                                     );
+                                    // Log Exception
+                                    this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateNewIncident', this.props.userPrincipalName);
                                     // delete the item if error occured
                                     await this.deleteIncident(incidentAdded.id);
                                     this.setState({
@@ -565,6 +805,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                     showLoader: false,
                                     formOpacity: 1
                                 });
+                                //log trace
+                                this.dataService.trackTrace(this.props.appInsights, 'Incident Creation Failed ', incidentAdded.id, this.props.userPrincipalName);
                                 this.props.showMessageBar(this.props.localeStrings.genericErrorMessage + ", " + this.props.localeStrings.errMsgForCreateIncident, constants.messageBarType.error);
                             }
                         } catch (error) {
@@ -572,6 +814,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                 constants.errorLogPrefix + "CreateIncident_CreateNewIncident \n",
                                 JSON.stringify(error)
                             );
+                            // Log Exception
+                            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateNewIncident', this.props.userPrincipalName);
                             this.setState({
                                 showLoader: false,
                                 formOpacity: 1
@@ -585,12 +829,161 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     constants.errorLogPrefix + "CreateIncident_CreateNewIncident \n",
                     JSON.stringify(error)
                 );
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateNewIncident', this.props.userPrincipalName);
+            }
+        }
+    }
+
+    // update the incident in incident transaction list
+    private updateIncidentDetails = async () => {
+        this.scrollToTop();
+        // incident info object
+        let incidentInfo: IncidentEntity = this.state.incDetailsItem;
+        this.props.hideMessageBar();
+        this.setState({
+            showLoader: true,
+            formOpacity: 0.5,
+            loaderMessage: this.props.localeStrings.genericLoaderMessage,
+            inputRegexValidation: this.dataService.getInputRegexValildationInitialState(),
+            inputValidation: getInputValildationInitialState()
+        })
+
+        // validate for required fields
+        if (!this.requiredFieldValidation(incidentInfo)) {
+            this.props.showMessageBar(this.props.localeStrings.reqFieldErrorMessage, constants.messageBarType.error);
+        }
+        else {
+            try {
+                // validate input strings for incident name and location
+                const regexValidation = this.dataService.regexValidation(incidentInfo);
+                if (regexValidation.incidentLocationHasError || regexValidation.incidentNameHasError) {
+                    this.props.showMessageBar(this.props.localeStrings.regexErrorMessage, constants.messageBarType.error);
+                    this.setState({
+                        inputRegexValidation: regexValidation,
+                        showLoader: false,
+                        formOpacity: 1
+                    });
+                }
+                else {
+                    let incNameStr = incidentInfo.incidentName.replace(/'/g, "''");
+
+                    // create graph endpoint for querying Incident Transaction list                    
+                    this.graphEndpoint = `${graphConfig.spSiteGraphEndpoint}${this.props.siteId}${graphConfig.listsGraphEndpoint}/${siteConfig.incidentsList}/items?$expand=fields&$filter=fields/IncidentName eq '${incNameStr}' and fields/IncidentId ne '${this.state.incDetailsItem.incidentId}'`;
+                    // show error if incident with same name already exists
+                    if (await this.dataService.getIncident(this.graphEndpoint, this.props.graph)) {
+                        this.setState({
+                            showLoader: false,
+                            formOpacity: 1
+                        });
+                        this.props.showMessageBar(this.props.localeStrings.duplicateIncidentName, constants.messageBarType.error);
+                    }
+                    else {
+                        try {
+                            this.setState({
+                                loaderMessage: this.props.localeStrings.incidentCreationLoaderMessage
+                            });
+                            // prepare the role assignment object which will be stored in 
+                            // incident transaction list in string format
+                            let roleAssignment = "";
+                            this.state.roleAssignments.forEach(roles => {
+                                roleAssignment += roles.role + " : " + roles.userObjString + "; ";
+                            });
+
+                            // create object to be passed in graph query
+                            const incidentInfoObj: any = {
+                                Description: incidentInfo.incidentDesc,
+                                IncidentStatus: incidentInfo.incidentStatus,
+                                Location: incidentInfo.location,
+                                IncidentName: incidentInfo.incidentName,
+                                RoleAssignment: roleAssignment.trim()
+                            }
+
+                            this.graphEndpoint = `${graphConfig.spSiteGraphEndpoint}${this.props.siteId}/lists/${siteConfig.incidentsList}/items/${this.state.incDetailsItem.incidentId}/fields`;
+
+                            const incidentUpdated = await this.dataService.updateItemInList(this.graphEndpoint, this.props.graph, incidentInfoObj);
+
+                            // check if incident is created
+                            if (incidentUpdated) {
+                                const existingMembers = await this.getExistingTeamMembers();
+                                console.log(existingMembers);
+
+                                const usersObj = this.compareTeamsMembership(existingMembers.value);
+
+                                // check if there are users to add
+                                if (usersObj.newAddedUsers.length > 0) {
+                                    // Add users to Team
+                                    await this.addUsersToTeam(usersObj.newAddedUsers);
+                                }
+
+                                // Get all existing tags
+                                let tagsList = await this.getAllTags();
+                                // check and get if new tags needs to be created
+                                const newRole = this.checkIfNewTagCreationNeeded(tagsList.value);
+
+                                if (newRole.length > 0) {
+                                    // create the role object from role assignements needed for tag creation
+                                    const roles = this.createNewRoleObject(newRole);
+                                    // create the tag for new role
+                                    await this.createTagObject(this.state.teamGroupId, roles);
+                                }
+
+                                if (usersObj.newAddedUsers.length > 0) {
+                                    tagsList = await this.getAllTags();
+                                    await this.addUsersToTag(usersObj.newAddedUsers, tagsList.value);
+                                }
+
+                                // check if there are users to remove
+                                if (usersObj.removedMembershipIds.length > 0) {
+                                    // remove users from Team
+                                    await this.removeUsersFromTeam(usersObj.removedMembershipIds);
+                                }
+
+                                console.log(constants.infoLogPrefix + "Incident Updated");
+                                //log trace
+                                this.dataService.trackTrace(this.props.appInsights, 'Incident Updated', this.state.incDetailsItem.incidentId, this.props.userPrincipalName);
+                                this.setState({
+                                    showLoader: false,
+                                    formOpacity: 1
+                                });
+                                this.props.showMessageBar(this.props.localeStrings.updateSuccessMessage, constants.messageBarType.success);
+                                this.props.onBackClick(true);
+                            }
+                            else {
+                                this.setState({
+                                    showLoader: false,
+                                    formOpacity: 1
+                                });
+                                this.props.showMessageBar(this.props.localeStrings.genericErrorMessage + ", " + this.props.localeStrings.errMsgForUpdateIncident, constants.messageBarType.error);
+                            }
+                        } catch (error) {
+                            console.error(
+                                constants.errorLogPrefix + "UpdateIncident_UpdateIncident \n",
+                                JSON.stringify(error)
+                            );
+                            // Log Exception
+                            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'UpdateIncident_UpdateIncident', this.props.userPrincipalName);
+                            this.setState({
+                                showLoader: false,
+                                formOpacity: 1
+                            });
+                            this.props.showMessageBar(this.props.localeStrings.genericErrorMessage + ", " + this.props.localeStrings.errMsgForUpdateIncident, constants.messageBarType.error);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(
+                    constants.errorLogPrefix + "UpdateIncident_UpdateIncident \n",
+                    JSON.stringify(error)
+                );
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'UpdateIncident_UpdateIncident', this.props.userPrincipalName);
             }
         }
     }
 
     // perform required fields validation
-    private requiredFieldValidation = (incidentInfo: CreateIncidentEntity): boolean => {
+    private requiredFieldValidation = (incidentInfo: IncidentEntity): boolean => {
         let inputValidationObj = getInputValildationInitialState();
         let reqFieldValidationSuccess = true;
         if (incidentInfo.incidentName === "" || incidentInfo.incidentName === undefined) {
@@ -645,7 +1038,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
             this.createTeamGroup(incidentId).then(async (groupInfo) => {
                 try {
                     console.log(constants.infoLogPrefix + "Teams group created on - " + new Date());
-
+                    //log trace
+                    this.dataService.trackTrace(this.props.appInsights, "Teams group created ", incidentId, this.props.userPrincipalName);
                     // wait for 2 seconds to ensure team group is available via graph API
                     await this.timeout(2000);
 
@@ -653,22 +1047,28 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     const teamInfo = await this.createTeam(groupInfo);
                     if (teamInfo.status) {
                         console.log(constants.infoLogPrefix + "Teams created on - " + new Date());
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "Teams created ", incidentId, this.props.userPrincipalName);
                         // create channels
                         const channelCreatedInfo: any = await this.createChannels(teamInfo.data);
                         console.log(constants.infoLogPrefix + "channels created");
-
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "Channel created ", incidentId, this.props.userPrincipalName);
                         const siteURL = "https://" + this.props.tenantName + ".sharepoint.com/sites/" + groupInfo.mailNickname;
 
                         // create assessment channel and tab
                         await this.createAssessmentChannelAndTab(groupInfo.id, siteURL, groupInfo.mailNickname);
 
                         console.log(constants.infoLogPrefix + "Assessment Channel and tab created");
-
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "Assessment Channel and tab created ", incidentId, this.props.userPrincipalName);
                         const siteBaseURL = "https://" + this.props.tenantName + ".sharepoint.com/sites/";
 
                         // create news channel and tab
                         await this.createNewsTab(groupInfo, siteBaseURL);
                         console.log(constants.infoLogPrefix + "News tab created");
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "News tab create ", incidentId, this.props.userPrincipalName);
 
                         // create URL to get site Id
                         const urlForSiteId = graphConfig.spSiteGraphEndpoint + this.props.tenantName + ".sharepoint.com:/sites/" + groupInfo.mailNickname + "?$select=id";
@@ -679,6 +1079,9 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         // call method to create assessment list
                         const assessmentList = await this.createAssessmentList(groupInfo.mailNickname, siteDetails.id);
                         console.log(constants.infoLogPrefix + "Assessment list created");
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "Assessment list created ", incidentId, this.props.userPrincipalName);
+
 
                         // get all columns to get status column ID
                         const allColumnsGraphEndpoint = graphConfig.sitesGraphEndpoint + "/" + siteDetails.id + graphConfig.listsGraphEndpoint + "/" + assessmentList.id + graphConfig.columnsGraphEndpoint;
@@ -707,14 +1110,26 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         await this.updatedTeamIdInList(listItemId, updateItemObj);
                         console.log(constants.infoLogPrefix + "List item updated with Team Id");
 
-                        // create the tags for incident commander and each selected roles
-                        await this.createTagObject(teamInfo);
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "List item updated with Team Id ", incidentId, this.props.userPrincipalName);
+
+                        let roles: any = this.state.roleAssignments;
+                        roles.push({
+                            role: constants.incidentCommanderRoleName,
+                            userNamesString: this.state.incDetailsItem.incidentCommander.userName,
+                            userDetailsObj: [this.state.incDetailsItem.incidentCommander]
+                        })
+                        // create the tags for incident commander and each selected roles                        
+                        await this.createTagObject(teamInfo.data.id, roles);
 
                         // update the results object
                         teamCreationResult.fullyDone = (channelCreatedInfo.is_fully_created ? true : false);
                         teamCreationResult.partiallyDone = !(channelCreatedInfo.is_fully_created);
                         teamCreationResult.error.channelCreations = channelCreatedInfo;
                         teamCreationResult.teamInfo = groupInfo;
+
+                        //log trace
+                        this.dataService.trackTrace(this.props.appInsights, "Tags are created ", incidentId, this.props.userPrincipalName);
 
                         this.setState({
                             showLoader: false,
@@ -740,6 +1155,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         constants.errorLogPrefix + "CreateIncident_createTeamAndChannels \n",
                         JSON.stringify(error)
                     );
+                    // Log Exception
+                    this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_createTeamAndChannels', this.props.userPrincipalName);
                     // delete the group if some error occured
                     await this.deleteTeamGroup(groupInfo.id);
                     // delete the item if error occured
@@ -756,6 +1173,9 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     constants.errorLogPrefix + "CreateIncident_createTeamAndChannels \n",
                     JSON.stringify(error)
                 );
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_createTeamAndChannels', this.props.userPrincipalName);
+
                 // delete the item if error occured
                 this.deleteIncident(listItemId);
 
@@ -800,6 +1220,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 constants.errorLogPrefix + "CreateIncident_UpdatedIncidentId \n",
                 JSON.stringify(error)
             );
+            // Log Exception
+            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_UpdatedIncidentId', this.props.userPrincipalName);
         }
     }
 
@@ -814,6 +1236,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 constants.errorLogPrefix + "CreateIncident_UpdatedTeamIdInList \n",
                 JSON.stringify(error)
             );
+            // Log Exception
+            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_UpdatedTeamIdInList', this.props.userPrincipalName);
         }
     }
 
@@ -821,9 +1245,9 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
     private createTeamGroup = async (incId: string): Promise<any> => {
         return new Promise(async (resolve, reject) => {
             try {
-                let incDetails = this.state.createIncDetailsItem;
+                let incDetails = this.state.incDetailsItem;
                 // update the date format
-                incDetails.startDateTime = moment(this.state.createIncDetailsItem.startDateTime).format("DDMMMYYYY");
+                incDetails.startDateTime = moment(this.state.incDetailsItem.startDateTime).format("DDMMMYYYY");
 
                 // create members array
                 const membersArr: any = [];
@@ -885,9 +1309,208 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 );
                 reject(ex);
                 console.error("EOC App - CreateTeamGroup_Failed to create teams group \n" + ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateTeamGroup', this.props.userPrincipalName);
+
             }
 
         })
+    }
+
+    // get existing  members of the team
+    private getExistingTeamMembers = async (): Promise<any> => {
+        return new Promise(async (resolve, reject) => {
+
+            this.graphEndpoint = graphConfig.teamsGraphEndpoint + "/" + this.state.teamGroupId + graphConfig.membersGraphEndpoint;
+            try {
+                const members = await this.dataService.getGraphData(this.graphEndpoint, this.props.graph);
+                resolve(members);
+            } catch (ex) {
+                console.error(
+                    constants.errorLogPrefix + "CreateIncident_DeleteTeamGroup \n",
+                    JSON.stringify(ex)
+                );
+                reject(ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_DeleteTeamGroup', this.props.userPrincipalName);
+
+            }
+        });
+    }
+
+    // compare the teams membership with old and new roles
+    private compareTeamsMembership = (allExistingMembers: any): any => {
+        const teamsMembers = allExistingMembers.filter((user: any) => {
+            return user.roles.length === 0;
+        });
+
+        const existingRoleUsers: any = [];
+        this.state.existingRolesMembers.forEach((role: any) => {
+            role.userDetailsObj.forEach((user: any) => {
+                existingRoleUsers.push(user.userId);
+            })
+        });
+
+        const newRoleUsers: any = [];
+        this.state.roleAssignments.forEach((role: any) => {
+            role.userDetailsObj.forEach((user: any) => {
+                newRoleUsers.push({ role: role.role, userId: user.userId });
+            })
+        });
+
+        let newAddedUsers = newRoleUsers.filter((user: any) => existingRoleUsers.indexOf(user.userId) === -1);
+        let removedUsers: any = [];
+
+        existingRoleUsers.forEach((user: string) => {
+            let isFound = false;
+            newRoleUsers.forEach((newUser: any) => {
+                if (user === newUser.userId)
+                    isFound = true;
+            });
+            if (!isFound) {
+                removedUsers.push(user);
+            }
+        });
+
+        const removedMembershipIds: any = [];
+        removedUsers.forEach((user: any) => {
+            teamsMembers.filter((member: any) => {
+                if (member.userId === user) {
+                    removedMembershipIds.push(member.id);
+                }
+            })
+        });
+
+        let usersObj = {
+            newAddedUsers: newAddedUsers,
+            removedUsers: removedUsers,
+            removedMembershipIds: removedMembershipIds
+        }
+
+        return usersObj;
+    }
+
+    // remove users from Teams members
+    private async removeUsersFromTeam(userIds: []): Promise<any> {
+        let result: any = {
+            isAllDeleted: false,
+            failedEntries: [],
+            successEntries: []
+        };
+        return new Promise(async (resolve, reject) => {
+            let allDone = false;
+            let counter = 0;
+
+            if (userIds.length > 0) {
+                while (!allDone) {
+                    let user = userIds[counter];
+                    try {
+                        this.graphEndpoint = graphConfig.teamsGraphEndpoint + "/" + this.state.teamGroupId + graphConfig.membersGraphEndpoint + "/" + user;
+
+                        await this.dataService.sendGraphDeleteRequest(this.graphEndpoint, this.props.graph);
+
+                        counter++;
+                    } catch (ex: any) {
+                        console.error(
+                            constants.errorLogPrefix + "UpdateIncident_DeleteMemberFromTeam \n",
+                            JSON.stringify(ex)
+                        );
+                        result.failedEntries.push(user);
+                        counter++;
+
+                    }
+                    allDone = userIds.length === counter;
+                }
+            }
+            result.isAllDeleted = result.failedEntries.length === 0 ? true : false;
+            resolve(result);
+        });
+    }
+
+    // add users to teams members
+    private async addUsersToTeam(userIds: []): Promise<any> {
+        return new Promise(async (resolve, reject) => {
+            this.graphEndpoint = graphConfig.teamsGraphEndpoint + "/" + this.state.teamGroupId + "/" + graphConfig.addMembersGraphEndpoint;
+
+            const usersToAdd: any = [];
+            userIds.forEach((user: any) => {
+                usersToAdd.push({
+                    "@odata.type": "microsoft.graph.aadUserConversationMember",
+                    "roles": [],
+                    "user@odata.bind": graphConfig.addUsersGraphEndpoint + "('" + user.userId + "')"
+                });
+            });
+
+            const memmbersObj = {
+                "values": usersToAdd
+            }
+
+            try {
+                const usersAdded = await this.dataService.sendGraphPostRequest(this.graphEndpoint, this.props.graph, memmbersObj);
+                resolve(usersAdded);
+            } catch (ex) {
+                console.error(
+                    constants.errorLogPrefix + "UpdateIncident_AddUsersToTeam \n",
+                    JSON.stringify(ex)
+                );
+                reject(ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'UpdateIncident_AddUsersToTeam', this.props.userPrincipalName);
+            }
+        });
+    }
+
+    // add users to tag groups
+    private async addUsersToTag(userIds: any, tagsList: any): Promise<any> {
+        let result: any = {
+            isFullyCreated: false,
+            isPartiallyCreated: false,
+            failedEntries: [],
+            successEntries: []
+        };
+
+        return new Promise(async (resolve, reject) => {
+            let allDone = false;
+            let counter = 0;
+
+            if (userIds.length > 0) {
+                while (!allDone) {
+                    let user = userIds[counter];
+                    try {
+                        const existingTagDetails = tagsList.filter((tags: any) => tags.displayName === user.role);
+
+                        if (existingTagDetails.length > 0) {
+                            this.graphEndpoint = graphConfig.betaGraphEndpoint + this.state.teamGroupId + graphConfig.tagsGraphEndpoint + "/" + existingTagDetails[0].id + graphConfig.membersGraphEndpoint;
+                            const members: any = [];
+
+                            members.push({
+                                "userId": user.userId
+                            })
+
+                            let addMember = await this.dataService.sendGraphPostRequest(this.graphEndpoint, this.props.graph, members[0]);
+
+                            if (addMember) {
+                                result.successEntries.push(user.userId);
+                            }
+                            else {
+                                result.failedEntries.push(user.userId);
+                            }
+                        }
+                        counter++;
+                    } catch (ex: any) {
+                        console.error(
+                            constants.errorLogPrefix + "UpdateIncident_UpdateTagMember \n",
+                            JSON.stringify(ex)
+                        );
+                        result.failedEntries.push(user.userId);
+                        counter++;
+                    }
+                    allDone = userIds.length === counter;
+                }
+            }
+            result.isFullyCreated = result.failedEntries.length === 0 ? true : false;
+            resolve(result);
+        });
     }
 
     // create Team associated with Teams group
@@ -925,6 +1548,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         constants.errorLogPrefix + "CreateIncident_CreateTeam \n",
                         JSON.stringify(updationError)
                     );
+                    // Log Exception
+                    this.dataService.trackException(this.props.appInsights, updationError, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateTeam', this.props.userPrincipalName);
                     if (updationError.statusCode === 409 && updationError.message === "Team already exists") {
                         isTeamCreated = true;
                         this.graphEndpoint = graphConfig.teamGroupsGraphEndpoint + groupInfo.id;
@@ -1031,6 +1656,9 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         constants.errorLogPrefix + "CreateIncident_CreateChannels \n",
                         JSON.stringify(ex)
                     );
+                    // Log Exception
+                    this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateChannels', this.props.userPrincipalName);
+
                     if (noOfAttempt >= MAX_NUMBER_OF_ATTEMPT) {
                         let channelObj: ChannelCreationStatus = {
                             channelName: channel.displayName,
@@ -1092,6 +1720,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     JSON.stringify(ex)
                 );
                 reject(ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateAssessmentChannelAndTab', this.props.userPrincipalName);
 
             }
         });
@@ -1138,6 +1768,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     JSON.stringify(ex)
                 );
                 reject(ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateNewsTab', this.props.userPrincipalName);
             }
         });
     }
@@ -1172,18 +1804,15 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     JSON.stringify(ex)
                 );
                 reject(ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateAssessmentList', this.props.userPrincipalName);
             }
         });
     }
 
     // loop through selected roles and create tag object
-    private async createTagObject(teamInfo: any): Promise<any> {
-        let roles: any = this.state.roleAssignments;
-        roles.push({
-            role: constants.incidentCommanderRoleName,
-            userNamesString: this.state.createIncDetailsItem.incidentCommander.userName,
-            userDetailsObj: [this.state.createIncDetailsItem.incidentCommander]
-        })
+    private async createTagObject(teamId: any, roles: any): Promise<any> {
+
         let result: any = {
             isFullyCreated: false,
             isPartiallyCreated: false,
@@ -1199,7 +1828,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                 while (!allDone) {
                     let role = roles[counter];
                     try {
-                        this.graphEndpoint = graphConfig.betaGraphEndpoint + teamInfo.data.id + graphConfig.tagsGraphEndpoint;
+                        this.graphEndpoint = graphConfig.betaGraphEndpoint + teamId + graphConfig.tagsGraphEndpoint;
                         const members: any = [];
                         role.userDetailsObj.forEach((users: any) => {
                             members.push({
@@ -1283,6 +1912,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                         constants.errorLogPrefix + "CreateIncident_CreateTag \n" + new Date() + "\n",
                         JSON.stringify(creationError)
                     );
+                    // Log Exception
+                    this.dataService.trackException(this.props.appInsights, creationError, constants.componentNames.IncidentDetailsComponent, 'CreateIncident_CreateTag', this.props.userPrincipalName);
                     if (creationError.statusCode === 409 && creationError.message === "Tag already exists") {
                         isTagCreated = true;
                     }
@@ -1295,6 +1926,51 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
         });
     }
 
+    // Get all existing tags for the team
+    private async getAllTags(): Promise<any> {
+        return new Promise(async (resolve, reject) => {
+            this.graphEndpoint = graphConfig.betaGraphEndpoint + this.state.teamGroupId + "/" + graphConfig.tagsGraphEndpoint;
+            try {
+                const existingTags = await this.dataService.getGraphData(this.graphEndpoint, this.props.graph);
+                resolve(existingTags);
+            } catch (ex) {
+                console.error(
+                    constants.errorLogPrefix + "UpdateIncident_GetAllTags \n",
+                    JSON.stringify(ex)
+                );
+                reject(ex);
+                // Log Exception
+                this.dataService.trackException(this.props.appInsights, ex, constants.componentNames.IncidentDetailsComponent, 'UpdateIncident_GetAllTags', this.props.userPrincipalName);
+            }
+        });
+    }
+
+    // check if any new role is added which requires new tag creation
+    private checkIfNewTagCreationNeeded(tagList: any): any {
+        const tags = tagList.map((tag: any) => {
+            return tag.displayName;
+        });
+
+        const roles = this.state.roleAssignments.map((role: any) => {
+            return role.role;
+        })
+
+        return roles.filter((tag: any) => tags.indexOf(tag) === -1);
+    }
+
+    // create a role object to be used in tags creation
+    private createNewRoleObject(newRole: any): any {
+        const rolesToAdd: any = [];
+        newRole.forEach((roleName: string) => {
+            this.state.roleAssignments.forEach(role => {
+                if (role.role === roleName) {
+                    rolesToAdd.push(role);
+                }
+            });
+        });
+        return rolesToAdd;
+    }
+
     // method to delete team group
     private async deleteTeamGroup(group_id: string): Promise<any> {
         return new Promise(async (resolve, reject) => {
@@ -1302,11 +1978,14 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
             try {
                 const deleteResult = await this.dataService.sendGraphDeleteRequest(this.graphEndpoint, this.props.graph);
                 resolve(deleteResult);
+
             } catch (ex) {
                 console.error(
                     constants.errorLogPrefix + "CreateIncident_DeleteTeamGroup \n",
                     JSON.stringify(ex)
                 );
+                //log trace
+                this.dataService.trackTrace(this.props.appInsights, "CreateIncident_DeleteTeamGroup ", '', this.props.userPrincipalName);
                 reject(ex);
             }
         });
@@ -1324,6 +2003,8 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     constants.errorLogPrefix + "CreateIncident_DeleteIncident \n",
                     JSON.stringify(ex)
                 );
+                //log trace
+                this.dataService.trackTrace(this.props.appInsights, "CreateIncident_DeleteIncident ", incidentId.toString(), this.props.userPrincipalName);
                 reject(ex);
             }
         });
@@ -1375,7 +2056,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     maxLength={constants.maxCharLengthForSingleLine}
                                                     required
                                                     onChange={(evt) => this.onTextInputChange(evt, "incidentName")}
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.incidentName ? this.state.createIncDetailsItem.incidentName : '') : ''}
+                                                    value={this.state.incDetailsItem ? (this.state.incDetailsItem.incidentName ? this.state.incDetailsItem.incidentName : '') : ''}
                                                     className="incident-details-input-field"
                                                     successIndicator={false}
                                                 />
@@ -1393,30 +2074,46 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     items={this.state.dropdownOptions ? this.state.dropdownOptions["typeOptions"] : []}
                                                     fluid={true}
                                                     search
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.incidentType ? this.state.createIncDetailsItem.incidentType : '') : ''}
+                                                    searchQuery={this.state.incidentTypeSearchQuery}
+                                                    onSearchQueryChange={this.onSearchQueryChange}
+                                                    value={this.state.incDetailsItem ? (this.state.incDetailsItem.incidentType ? this.state.incDetailsItem.incidentType : '') : ''}
                                                     onChange={this.onIncidentTypeChange}
-                                                    className="incident-type-dropdown"
+                                                    className={this.state.isEditMode ? "incident-type-dropdown-disabled" : "incident-type-dropdown"}
+                                                    disabled={this.state.isEditMode}
                                                 />
                                                 {this.state.inputValidation.incidentTypeHasError && (
                                                     <label className="message-label">{this.props.localeStrings.incidentTypeRequired}</label>
                                                 )}
                                             </div>
                                             <div className="incident-grid-item">
-
-                                                <FormInput
-                                                    label={this.props.localeStrings.fieldStartDate}
-                                                    type="datetime-local"
-                                                    placeholder={this.props.localeStrings.phStartDate}
-                                                    fluid={true}
-                                                    required
-                                                    onChange={(evt) => this.onTextInputChange(evt, "startDateTime")}
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.startDateTime ? this.state.createIncDetailsItem.startDateTime : '') : ''}
-                                                    className={this.state.createIncDetailsItem && this.state.createIncDetailsItem.startDateTime ? "incident-details-date-field" : "dte-ph"}
-                                                    successIndicator={false}
-                                                />
-                                                {this.state.inputValidation.incidentStartDateTimeHasError && (
-                                                    <label className="message-label">{this.props.localeStrings.startDateRequired}</label>
-                                                )}
+                                                {(this.props.incidentData && this.props.incidentData.incidentId) ?
+                                                    <FormInput
+                                                        label={this.props.localeStrings.fieldStartDate}
+                                                        type="text"
+                                                        placeholder={this.props.localeStrings.phStartDate}
+                                                        fluid={true}
+                                                        value={this.state.incDetailsItem.startDateTime ? this.state.incDetailsItem.startDateTime : ''}
+                                                        disabled
+                                                        className="incident-details-input-field-disabled"
+                                                    />
+                                                    :
+                                                    <>
+                                                        <FormInput
+                                                            label={this.props.localeStrings.fieldStartDate}
+                                                            type="datetime-local"
+                                                            placeholder={this.props.localeStrings.phStartDate}
+                                                            fluid={true}
+                                                            required
+                                                            onChange={(evt) => this.onTextInputChange(evt, "startDateTime")}
+                                                            value={this.state.incDetailsItem ? (this.state.incDetailsItem.startDateTime ? this.state.incDetailsItem.startDateTime : '') : ''}
+                                                            className={this.state.incDetailsItem && this.state.incDetailsItem.startDateTime ? "incident-details-date-field" : "dte-ph"}
+                                                            successIndicator={false}
+                                                        />
+                                                        {this.state.inputValidation.incidentStartDateTimeHasError && (
+                                                            <label className="message-label">{this.props.localeStrings.startDateRequired}</label>
+                                                        )}
+                                                    </>
+                                                }
                                             </div>
                                         </Col>
                                         <Col md={4} sm={8} xs={12}>
@@ -1426,9 +2123,9 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     placeholder={this.props.localeStrings.phIncidentStatus}
                                                     items={this.state.dropdownOptions ? this.state.dropdownOptions["statusOptions"] : []}
                                                     fluid={true}
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.incidentStatus ? this.state.createIncDetailsItem.incidentStatus : '') : ''}
+                                                    value={this.state.incDetailsItem ? (this.state.incDetailsItem.incidentStatus ? this.state.incDetailsItem.incidentStatus : '') : ''}
                                                     onChange={this.onIncidentStatusChange}
-                                                    className={this.state.createIncDetailsItem && this.state.createIncDetailsItem.incidentStatus ? "incident-details-dropdown" : "dropdown-placeholder"}
+                                                    className={this.state.incDetailsItem && this.state.incDetailsItem.incidentStatus ? "incident-details-dropdown" : "dropdown-placeholder"}
                                                 />
                                                 {this.state.inputValidation.incidentStatusHasError && (
                                                     <label className="message-label">{this.props.localeStrings.statusRequired}</label>
@@ -1448,9 +2145,10 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     selectionMode="single"
                                                     selectionChanged={this.handleIncCommanderChange}
                                                     placeholder={this.props.localeStrings.phIncidentCommander}
-                                                    className="incident-details-people-picker"
+                                                    className={this.state.isEditMode ? "incident-details-people-picker-disabled" : "incident-details-people-picker"}
+                                                    selectedPeople={this.state.selectedIncidentCommander}
+                                                    disabled={this.state.isEditMode}
                                                 />
-
                                                 {this.state.inputValidation.incidentCommandarHasError && (
                                                     <label className="message-label">{this.props.localeStrings.incidentCommanderRequired}</label>
                                                 )}
@@ -1463,7 +2161,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     maxLength={constants.maxCharLengthForSingleLine}
                                                     required
                                                     onChange={(evt) => this.onTextInputChange(evt, "location")}
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.location ? this.state.createIncDetailsItem.location : '') : ''}
+                                                    value={this.state.incDetailsItem ? (this.state.incDetailsItem.location ? this.state.incDetailsItem.location : '') : ''}
                                                     className="incident-details-input-field"
                                                     successIndicator={false}
                                                 />
@@ -1483,7 +2181,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     fluid={true}
                                                     maxLength={constants.maxCharLengthForMultiLine}
                                                     onChange={(evt) => this.onTextInputChange(evt, "incidentDesc")}
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.incidentDesc ? this.state.createIncDetailsItem.incidentDesc : '') : ''}
+                                                    value={this.state.incDetailsItem ? (this.state.incDetailsItem.incidentDesc ? this.state.incDetailsItem.incidentDesc : '') : ''}
                                                     className="incident-details-description-area"
                                                 />
                                                 {this.state.inputValidation.incidentDescriptionHasError && (
@@ -1502,11 +2200,11 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                     items={this.state.dropdownOptions ? this.state.dropdownOptions["roleOptions"] : []}
                                                     fluid={true}
                                                     onChange={this.onRoleChange}
-                                                    value={this.state.createIncDetailsItem ? (this.state.createIncDetailsItem.selectedRole ? this.state.createIncDetailsItem.selectedRole : '') : ''}
-                                                    className={this.state.createIncDetailsItem && this.state.createIncDetailsItem.selectedRole ? "incident-details-dropdown" : "dropdown-placeholder"}
+                                                    value={this.state.incDetailsItem ? (this.state.incDetailsItem.selectedRole ? this.state.incDetailsItem.selectedRole : '') : ''}
+                                                    className={this.state.incDetailsItem && this.state.incDetailsItem.selectedRole ? "incident-details-dropdown" : "dropdown-placeholder"}
                                                 />
                                             </div>
-                                            {this.state.createIncDetailsItem.selectedRole && this.state.createIncDetailsItem.selectedRole.indexOf("New Role") > -1 ?
+                                            {this.state.incDetailsItem.selectedRole && this.state.incDetailsItem.selectedRole.indexOf("New Role") > -1 ?
                                                 <>
                                                     <div className="incident-grid-item">
                                                         <FormInput
@@ -1572,24 +2270,64 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                         <Col md={6} sm={8} xs={12}>
                                             <div className="role-assignment-table">
                                                 <Row id="role-grid-thead" xs={3} sm={3} md={3}>
-                                                    <Col md={5} sm={4} xs={4} key={0}>{this.props.localeStrings.headerRole}</Col>
-                                                    <Col md={5} sm={4} xs={4} key={1} className="thead-border-left">{this.props.localeStrings.headerUsers}</Col>
-                                                    <Col md={2} sm={4} xs={4} key={2} className="thead-border-left col-center">{this.props.localeStrings.headerDelete}</Col>
+                                                    <Col md={4} sm={4} xs={4} key={0}>{this.props.localeStrings.headerRole}</Col>
+                                                    <Col md={4} sm={4} xs={4} key={1} className="thead-border-left">{this.props.localeStrings.headerUsers}</Col>
+                                                    <Col md={2} sm={2} xs={2} key={3} className="thead-border-left col-center">{this.props.localeStrings.headerEdit}</Col>
+                                                    <Col md={2} sm={2} xs={2} key={2} className="thead-border-left col-center">{this.props.localeStrings.headerDelete}</Col>
                                                 </Row>
                                                 {this.state.roleAssignments.map((item, index) => (
-                                                    <Row xs={3} sm={3} md={3} key={index} id="role-grid-tbody">
-                                                        <Col md={5} sm={4} xs={4}>{item.role}</Col>
-                                                        <Col md={5} sm={4} xs={4}>{item.userNamesString}</Col>
-                                                        <Col md={2} sm={4} xs={4} className="col-center">
-                                                            <img
-                                                                src={require("../assets/Images/DeleteIcon.svg").default}
-                                                                alt="Delete Icon"
-                                                                className="role-delete-icon"
-                                                                onClick={(e) => this.deleteRoleItem(index)}
-                                                                title={this.props.localeStrings.headerDelete}
-                                                            />
-                                                        </Col>
-                                                    </Row>
+                                                    <>
+                                                        {this.state.isRoleInEditMode[index] ?
+                                                            <>
+                                                                <Row xs={3} sm={3} md={3} key={index} id="role-grid-tbody">
+                                                                    <Col md={10} sm={8} xs={8}>
+                                                                        <PeoplePicker
+                                                                            selectionMode="multiple"
+                                                                            selectionChanged={this.handleAssignedUserChangeInEditMode}
+                                                                            placeholder={this.props.localeStrings.phSearchUser}
+                                                                            className="incident-details-people-picker"
+                                                                            selectedPeople={this.state.selectedUsersInEditMode}
+                                                                        />
+                                                                    </Col>
+                                                                    <Col md={1} sm={2} xs={2} className="editRoleCol">
+                                                                        <Icon aria-label="Save"
+                                                                            iconName="Save"
+                                                                            className="role-edit-icon"
+                                                                            onClick={(e) => this.updateRoleAssignment(index)}
+                                                                        />
+                                                                    </Col>
+                                                                    <Col md={1} sm={2} xs={2} className="editRoleCol">
+                                                                        <Icon aria-label="Cancel" iconName="Cancel"
+                                                                            className="role-edit-icon"
+                                                                            onClick={(e) => this.exitEditModeForRoles(index)} />
+                                                                    </Col>
+                                                                </Row>
+                                                            </>
+                                                            :
+                                                            <Row xs={3} sm={3} md={3} key={index} id="role-grid-tbody">
+                                                                <Col md={4} sm={3} xs={3}>{item.role}</Col>
+                                                                <Col md={4} sm={3} xs={3}>{item.userNamesString}</Col>
+                                                                <Col md={2} sm={3} xs={3} className="col-center">
+                                                                    <img
+                                                                        src={require("../assets/Images/GridEditIcon.svg").default}
+                                                                        alt="Edit Icon"
+                                                                        className="role-icon"
+                                                                        onClick={(e) => this.editRoleItem(index)}
+                                                                        title={this.props.localeStrings.headerEdit}
+                                                                    />
+                                                                </Col>
+                                                                <Col md={2} sm={3} xs={3} className="col-center">
+                                                                    <img
+                                                                        src={require("../assets/Images/DeleteIcon.svg").default}
+                                                                        alt="Delete Icon"
+                                                                        className="role-icon"
+                                                                        onClick={(e) => this.deleteRoleItem(index)}
+                                                                        title={this.props.localeStrings.headerDelete}
+                                                                    />
+                                                                </Col>
+                                                            </Row>
+                                                        }
+                                                    </>
                                                 ))}
                                             </div>
                                         </Col>
@@ -1608,16 +2346,29 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                                         <ChevronStartIcon /> &nbsp;
                                                         <label>{this.props.localeStrings.btnBack}</label>
                                                     </Button>
-                                                    <Button
-                                                        primary
-                                                        onClick={this.createNewIncident}
-                                                        fluid={true}
-                                                        id="new-incident-create-btn"
-                                                        title={this.props.localeStrings.btnCreateIncident}
-                                                    >
-                                                        <img src={require("../assets/Images/ButtonEditIcon.svg").default} alt="edit icon" /> &nbsp;
-                                                        <label>{this.props.localeStrings.btnCreateIncident}</label>
-                                                    </Button>
+                                                    {this.state.isEditMode ?
+                                                        <Button
+                                                            primary
+                                                            onClick={this.updateIncidentDetails}
+                                                            fluid={true}
+                                                            id="new-incident-create-btn"
+                                                            title={this.props.localeStrings.btnUpdateIncident}
+                                                        >
+                                                            <img src={require("../assets/Images/ButtonEditIcon.svg").default} alt="edit icon" /> &nbsp;
+                                                            <label>{this.props.localeStrings.btnUpdateIncident}</label>
+                                                        </Button>
+                                                        :
+                                                        <Button
+                                                            primary
+                                                            onClick={this.createNewIncident}
+                                                            fluid={true}
+                                                            id="new-incident-create-btn"
+                                                            title={this.props.localeStrings.btnCreateIncident}
+                                                        >
+                                                            <img src={require("../assets/Images/ButtonEditIcon.svg").default} alt="edit icon" /> &nbsp;
+                                                            <label>{this.props.localeStrings.btnCreateIncident}</label>
+                                                        </Button>
+                                                    }
                                                 </Flex>
                                             </div>
                                         </Col>
@@ -1626,7 +2377,6 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                             </div>
                         </div>
                     </>
-
                 </div>
             </>
         );

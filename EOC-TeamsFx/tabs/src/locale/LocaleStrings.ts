@@ -53,8 +53,10 @@ const localizedStrings = {
         headerRole: "Role",
         headerUsers: "Users",
         headerDelete: "Delete",
+        headerEdit: "Edit",
         btnBack: "Back",
         btnCreateIncident: "Create New Incident",
+        btnUpdateIncident: "Update Incident",
         // Error Messages
         genericLoaderMessage: "Please wait...",
         incidentCreationLoaderMessage: "Please wait, this will take a few moments to complete!",
@@ -66,6 +68,7 @@ const localizedStrings = {
         dropdownRetrievalFailedErrMsg: "while retrieving the dropdown options, please refresh the app.",
         getIncidentsFailedErrMsg: "while retrieving incidents, please refresh the app.",
         updateStatusSuccessMessage: "Incident status updated successfully!",
+        updateSuccessMessage: "Incident updated successfully!",
         regexErrorMessage: "& and # are not allowed!",
         reqFieldErrorMessage: "Please fill in required details!",
         duplicateIncidentName: "Incident with this name already exists, Please use another Incident name.",

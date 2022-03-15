@@ -18,14 +18,7 @@ import { localizedStrings } from "../locale/LocaleStrings";
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 initializeIcons();
-
-const appInsights = new ApplicationInsights({
-        config: {
-            instrumentationKey:  process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY
-        }
-});
-
-appInsights.loadAppInsights();
+let appInsights: ApplicationInsights;
 
 interface IEOCHomeState {
     showLoginPage: boolean;
@@ -40,6 +33,8 @@ interface IEOCHomeState {
     currentUserName: string;
     currentUserId: string;
     loaderMessage: string;
+    selectedIncident: any;
+    userPrincipalName: any;
 }
 
 interface IEOCHomeProps {
@@ -62,7 +57,7 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
         // create graph client without asking for login based on previous sessions
         const credential = new TeamsUserCredential();
         const graph = createMicrosoftGraphClient(credential, scope);
-        
+
         this.state = {
             showLoginPage: true,
             graph: graph,
@@ -76,6 +71,8 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
             currentUserName: "",
             currentUserId: "",
             loaderMessage: localeStrings.genericLoaderMessage,
+            selectedIncident: [],
+            userPrincipalName: null
         }
     }
 
@@ -88,19 +85,33 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
             microsoftTeams.getContext(ctx => {
                 if (ctx && ctx.locale && ctx.locale !== "") {
                     this.setState({
-                        locale: ctx.locale
+                        locale: ctx.locale,
+                        userPrincipalName: ctx.userPrincipalName
                     })
                 }
                 else {
                     this.setState({
-                        locale: constants.defaultLocale
+                        locale: constants.defaultLocale,
+                        userPrincipalName: ctx.userPrincipalName
                     })
                 }
             })
+
+            //Initialize App Insights
+            appInsights = new ApplicationInsights({
+                config: {
+                    instrumentationKey: process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY ? process.env.REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY : ''
+                }
+            });
+
+            appInsights.loadAppInsights();
         } catch (error) {
             this.setState({
                 locale: constants.defaultLocale
-            })
+            });
+            //log exception to AppInsights
+            this.dataService.trackException(appInsights, error, constants.componentNames.EOCHomeComponent, 'ComponentDidMount', this.state.userPrincipalName);
+
         }
 
         // call method to get the tenant details
@@ -192,11 +203,13 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
                 tenantName: tenantName,
                 siteId: siteDetails.id
             })
-        } catch (error) {
+        } catch (error: any) {
             console.error(
                 constants.errorLogPrefix + "_EOCHome_GetTenantAndSiteDetails \n",
                 JSON.stringify(error)
             );
+            //log exception to AppInsights
+            this.dataService.trackException(appInsights, error, constants.componentNames.EOCHomeComponent, 'GetTenantAndSiteDetails', this.state.userPrincipalName);
         }
     }
 
@@ -209,11 +222,13 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
                 currentUserName: currentUser.givenName,
                 currentUserId: currentUser.id
             })
-        } catch (error) {
+        } catch (error: any) {
             console.error(
-                constants.errorLogPrefix + "_EOCHome_GetTenantAndSiteDetails \n",
+                constants.errorLogPrefix + "_EOCHome_GetCurrentUserDetails \n",
                 JSON.stringify(error)
             );
+            //log exception to AppInsights
+            this.dataService.trackException(appInsights, error, constants.componentNames.EOCHomeComponent, 'GetCurrentUserDetails', this.state.userPrincipalName);
         }
     }
 
@@ -233,6 +248,20 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
         })
     }
 
+    // changes state to show create incident form
+    private showNewForm = () => {
+        this.setState({ showIncForm: true, selectedIncident: [] });
+        this.hideMessageBar();
+    }
+
+    // changes state to show update incident form
+    private showEditForm = (incidentData: any) => {
+        this.setState({
+            showIncForm: true,
+            selectedIncident: incidentData
+        })
+    }
+
     // changes state to show message bar and dashboard
     private handleBackClick = (showMessageBar: boolean) => {
         if (showMessageBar) {
@@ -244,20 +273,17 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
     }
 
     public render() {
-
         // let localeStrings = new LocalizedStrings(localizedStrings);
         if (this.state.locale && this.state.locale !== "") {
             localeStrings.setLanguage(this.state.locale);
         }
-        appInsights.trackTrace({ message: "EOCHome" });
-        
         return (
             <>
-            {this.state.locale === "" ?
-                <>
-                    <Loader label={this.state.loaderMessage} size="largest" />
-                </>
-                :                
+                {this.state.locale === "" ?
+                    <>
+                        <Loader className="loaderAlign" label={this.state.loaderMessage} size="largest" />
+                    </>
+                    :
                     <>
                         <EocHeader clickcallback={() => { }}
                             localeStrings={localeStrings}
@@ -300,13 +326,14 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
                                         graph={this.state.graph}
                                         tenantName={this.state.tenantName}
                                         siteId={this.state.siteId}
-                                        onCreateTeamClick={() => {
-                                            this.setState({ showIncForm: true });
-                                            this.hideMessageBar();
-                                        }}
+                                        onCreateTeamClick={this.showNewForm}
+                                        onEditButtonClick={this.showEditForm}
                                         localeStrings={localeStrings}
+                                        onBackClick={this.handleBackClick}
                                         showMessageBar={this.showMessageBar}
                                         hideMessageBar={this.hideMessageBar}
+                                        appInsights={appInsights}
+                                        userPrincipalName={this.state.userPrincipalName}
                                     />
                                     :
                                     <IncidentDetails
@@ -318,6 +345,9 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
                                         hideMessageBar={this.hideMessageBar}
                                         localeStrings={localeStrings}
                                         currentUserId={this.state.currentUserId}
+                                        incidentData={this.state.selectedIncident}
+                                        appInsights={appInsights}
+                                        userPrincipalName={this.state.userPrincipalName}
                                     />
                                 }
                             </div>

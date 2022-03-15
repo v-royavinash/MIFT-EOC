@@ -3,7 +3,7 @@ import '../scss/Dashboard.module.scss';
 import { Client } from "@microsoft/microsoft-graph-client";
 import { Button, Flex, Loader, FormInput, SearchIcon } from "@fluentui/react-northstar";
 import CommonService from "../common/CommonService";
-import { initializeIcons, Pivot, IPivotItemProps, PivotItem } from '@fluentui/react';
+import { Pivot, IPivotItemProps, PivotItem } from '@fluentui/react';
 import BootstrapTable from "react-bootstrap-table-next";
 import paginationFactory from 'react-bootstrap-table2-paginator';
 import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
@@ -11,17 +11,21 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import siteConfig from '../config/siteConfig.json';
 import * as graphConfig from '../common/graphConfig';
 import * as constants from '../common/Constants';
-import UpdateIncident from "./UpdateIncident";
 import * as microsoftTeams from "@microsoft/teams-js";
+import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 export interface IDashboardProps {
     graph: Client;
     tenantName: string;
     siteId: string;
     onCreateTeamClick: Function;
+    onEditButtonClick(incidentData: any): void;
     localeStrings: any;
+    onBackClick(showMessageBar: boolean): void;
     showMessageBar(message: string, type: string): void;
     hideMessageBar(): void;
+    appInsights: ApplicationInsights;
+    userPrincipalName: any;
 }
 
 export interface IDashboardState {
@@ -100,7 +104,7 @@ class Dashboard extends React.PureComponent<IDashboardProps, IDashboardState> {
                 alt={this.props.localeStrings.edit}
                 className="grid-edit-icon"
                 title={this.props.localeStrings.edit}
-                onClick={() => { this.setState({ openUpdateIncidentPopup: true, selectedIncident: gridRow }); }}
+                onClick={() => this.props.onEditButtonClick(gridRow)}
             />
         );
     }
@@ -147,12 +151,17 @@ class Dashboard extends React.PureComponent<IDashboardProps, IDashboardState> {
                 filteredActiveIncidents: [...activeIncidents],
                 showLoader: false
             })
-        } catch (error) {
+        } catch (error: any) {
+            this.setState({
+                showLoader: false
+            })
             console.error(
                 constants.errorLogPrefix + "_Dashboard_GetDashboardData \n",
                 JSON.stringify(error)
             );
             this.props.showMessageBar(this.props.localeStrings.genericErrorMessage + ", " + this.props.localeStrings.getIncidentsFailedErrMsg, constants.messageBarType.error);
+            // Log Exception
+            this.dataService.trackException(this.props.appInsights, error, constants.componentNames.DashboardComponent, 'GetDashboardData', this.props.userPrincipalName);
         }
     }
 
@@ -335,19 +344,6 @@ class Dashboard extends React.PureComponent<IDashboardProps, IDashboardState> {
                                 </Flex>
                             </div>
                         </div>
-                        {this.state.openUpdateIncidentPopup &&
-                            <UpdateIncident
-                                incidentData={this.state.selectedIncident}
-                                openPopup={this.state.openUpdateIncidentPopup}
-                                closePopup={this.closeUpdateIncidentPopup}
-                                graph={this.props.graph}
-                                tenantName={this.props.tenantName}
-                                siteId={this.props.siteId}
-                                showMessageBar={this.props.showMessageBar}
-                                hideMessageBar={this.props.hideMessageBar}
-                                localeStrings={this.props.localeStrings}
-                            />
-                        }
                         <div id="dashboard-pivot-container">
                             <div className="container">
                                 <div className="grid-heading">{this.props.localeStrings.incidentDetails}</div>

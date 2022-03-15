@@ -17,6 +17,22 @@
         }
     }
 
+    .incident-details-input-field-disabled{
+        input {
+            font: normal normal normal 16px/21px Segoe UI;
+            opacity: 1;
+            height: 40px;
+            background-color: #D3D3D3;
+            color: #000000;
+        }
+
+        input::placeholder {
+            font: normal normal normal 14px/21px Segoe UI;
+            color: #979593;
+            opacity: 1;
+        }
+    }
+
     .dte-ph {
         input {
             height: 40px;
@@ -113,6 +129,31 @@
         }
     }
 
+    .incident-type-dropdown-disabled {
+        .ui-dropdown__container {
+            border-bottom: none;
+        }
+
+        .ui-dropdown__selected-items {
+            background-color: #D3D3D3;
+            border: 1px solid #FFFFFF;
+            border-radius: 0.1875rem;
+            height: 40px;
+        }
+
+        input[type="text"] {
+            font: normal normal normal 16px/21px Segoe UI;
+            opacity: 1;
+            color: #000000;
+        }
+
+        input::placeholder {
+            font: normal normal normal 14px/21px Segoe UI;
+            color: #979593;
+            opacity: 1;
+        }
+    }
+
     .thead-border-left {
         border-left: 0.25px solid #FFFFFF;
     }
@@ -149,6 +190,15 @@
 
     .incCommanderInfoIcon {
         padding-left: 3px;
+    }   
+
+    .role-edit-icon {
+        font-size: 22px;
+        color: #979593;
+        cursor: pointer;
+    }
+    .editRoleCol{
+        margin: auto;
     }
 }
 
@@ -234,8 +284,6 @@ div[class="incident-details"] {
                 color: #f26e86;
             }
 
-
-
             mgt-people-picker[class="incident-details-people-picker"] {
 
                 --input-border: 2px #FFFFFF solid;
@@ -252,6 +300,34 @@ div[class="incident-details"] {
                 /* person background color on hover */
 
                 --selected-person-background-color: #f6f6f6;
+
+                /* person item background color */
+
+                --color: white;
+                /* input area border focus color */
+                --placeholder-color: #979593;
+                /* placeholder text color */
+                --placeholder-size: 16px;
+                --placeholder-color--focus: #979593;
+                /* placeholder text focus color */
+            }
+
+            mgt-people-picker[class="incident-details-people-picker-disabled"] {
+
+                --input-border: 2px #D3D3D3 solid;
+
+                --input-background-color: #D3D3D3;
+                /* input area background color */
+                --input-border-color--hover: #D3D3D3;
+                /* input area border hover color */
+                --input-border-color--focus: #D3D3D3;
+                /* input area border focus color */
+                --dropdown-background-color: #D3D3D3;
+                /* selection area background color */
+                --dropdown-item-hover-background: #F0F0F0;
+                /* person background color on hover */
+
+                --selected-person-background-color: #D3D3D3;
 
                 /* person item background color */
 
@@ -354,7 +430,7 @@ div[class="incident-details"] {
                     font: normal normal normal 13px/20px Segoe UI;
                 }
 
-                img[class="role-delete-icon"] {
+                img[class="role-icon"]{
                     width: 20px;
                     height: 23px;
                     cursor: pointer;
@@ -415,9 +491,13 @@ div[class="incident-details"] {
                 div[id="role-grid-tbody"] {
                     font: normal normal normal 11pt/15pt Segoe UI;
 
-                    img[class="role-delete-icon"] {
+                    img[class="role-icon"] {
                         width: 10pt;
                         height: 12pt;
+                    }
+
+                    div[class="editRoleCol"] > *{
+                        font-size: 15px;
                     }
                 }
             }

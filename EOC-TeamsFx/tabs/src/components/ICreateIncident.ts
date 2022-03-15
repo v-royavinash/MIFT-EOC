@@ -1,5 +1,5 @@
-// interface for Skill form entity
-export interface ICreateIncidentEntity {
+// interface for incident details form entity
+export interface IIncidentEntity {
     incidentId: string;
     incidentName: string;
     incidentStatus: string;
@@ -12,8 +12,8 @@ export interface ICreateIncidentEntity {
     assignedUser: UserDetails[];
 }
 
-// interface for Create Incident form entity
-export class CreateIncidentEntity implements ICreateIncidentEntity {
+// class for incident details form entity
+export class IncidentEntity implements IIncidentEntity {
     public incidentId!: string;
     public incidentName!: string;
     public incidentStatus!: string;
@@ -35,6 +35,7 @@ export interface UserDetails {
 export interface RoleAssignments {
     role: string;
     userNamesString: string;
+    userObjString: string;
     userDetailsObj: UserDetails[];
 }
 
