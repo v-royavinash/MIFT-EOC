@@ -1,18 +1,23 @@
 import { Client } from "@microsoft/microsoft-graph-client";
 import * as constants from './Constants';
 import moment from "moment";
+import { SeverityLevel } from "@microsoft/applicationinsights-common";
 
 export interface IListItem {
-    itemId: string;
-    incidentId: number;
-    incidentName: string;
-    incidentCommander: string;
-    status: string;
-    location: string;
-    startDate: string;
-    startDateUTC: string;
-    modifiedDate: string;
-    teamWebURL: string;
+    itemId?: string;
+    incidentId?: number;
+    incidentName?: string;
+    incidentCommander?: string;
+    status?: string;
+    location?: string;
+    startDate?: string;
+    startDateUTC?: string;
+    modifiedDate?: string;
+    teamWebURL?: string;
+    roleAssignments?: string;
+    incidentDescription?: string;
+    incidentType?: string;
+    incidentCommanderObj?: string;
 }
 
 export interface IInputValidationStates {
@@ -49,13 +54,17 @@ export default class CommonService {
                     itemId: item.fields.id,
                     incidentId: parseInt(item.fields.IncidentId),
                     incidentName: item.fields.IncidentName,
-                    incidentCommander: item.fields.IncidentCommander,
+                    incidentCommander: this.formatIncidentCommander(item.fields.IncidentCommander),
+                    incidentCommanderObj: item.fields.IncidentCommander,
                     status: item.fields.IncidentStatus,
                     location: item.fields.Location,
                     startDate: this.formatDate(item.fields.StartDateTime),
                     startDateUTC: new Date(item.fields.StartDateTime).toISOString().slice(0, new Date(item.fields.StartDateTime).toISOString().length - 1),
                     modifiedDate: item.fields.Modified,
-                    teamWebURL: item.fields.TeamWebURL
+                    teamWebURL: item.fields.TeamWebURL,
+                    incidentDescription: item.fields.Description,
+                    incidentType: item.fields.IncidentType,
+                    roleAssignments: item.fields.RoleAssignment
                 });
             });
             return formattedIncidentsData;
@@ -83,6 +92,21 @@ export default class CommonService {
         const formattedDate = dayStr + " " + monthNames[(parseInt(monthStr) - 1)] + ", " + yearStr + " " + hourStr + ":" + minuteStr;
 
         return formattedDate;
+    }
+
+    // format incident commander to show in the grid
+    formatIncidentCommander = (incidentCommanderStr: string): string => {
+        let incidentCommanders = "";
+
+        incidentCommanderStr.split(";").forEach(incCom => {
+            if (incCom.length > 0) {
+                incidentCommanders += incCom.split("|")[0] + ", ";
+            }
+        });
+        incidentCommanders = incidentCommanders.trim();
+        incidentCommanders = incidentCommanders.slice(0, -1);
+
+        return incidentCommanders;
     }
 
     //#endregion
@@ -227,5 +251,25 @@ export default class CommonService {
             return false;
         }
     }
+
+    //Log exception to App Insights
+    public trackException(appInsights: any, error: any, componentName: string, methodName: string, userPrincipalName:any) {
+        let exception = {
+            exception: error,
+            severityLevel: SeverityLevel.Error
+        };
+
+        appInsights.trackException(exception, { Component: componentName, Method: methodName ,User : userPrincipalName})
+    }
+
+    //track events in App Insight
+    public trackTrace(appInsights: any, message: string, incidentid: string, userPrincipalName:any) {
+        let trace = {
+            message: message,
+            severityLevel: SeverityLevel.Information
+        };
+        appInsights.trackTrace(trace, { User: userPrincipalName, IncidentID: incidentid})
+    }
     //#endregion
 }
+

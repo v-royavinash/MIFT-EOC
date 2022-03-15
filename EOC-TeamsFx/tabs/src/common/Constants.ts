@@ -37,3 +37,9 @@ export const m365EocUrl = "https://aka.ms/m365teoc";
 export const m365EocAppUrl = "https://aka.ms/m365teocapp";
 export const githubEocUrl = "https://aka.ms/m365teocapp"
 
+export const componentNames = {
+    EOCHomeComponent: 'EOCHome',
+    DashboardComponent: 'Dashboard',
+    IncidentDetailsComponent: 'IncidentDetails',
+    UpdateIncidentCompoent: 'UpdateIncident'
+}
