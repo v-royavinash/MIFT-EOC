@@ -3,7 +3,7 @@ const localizedStrings = {
         btnLogin: "Login",
         // Header strings
         appTitle: "Team Emergency Operation Center",
-        welcome: "Welcome",
+        welcome: "Welcome User",
         moreInfo: "More Info",
         support: "Support",
         feedback: "Feedback",
