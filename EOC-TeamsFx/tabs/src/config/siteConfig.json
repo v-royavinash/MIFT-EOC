@@ -1,13 +1,13 @@
 {
-    "siteName": "EOCSite",
-    "incidentsList": "IncidentTransaction",
-    "assessmentsList": "Assessments",
-    "incStatusList": "IncidentStatus",
-    "incTypeList": "IncidentType",
-    "roleAssignmentList": "RoleAssignments",
+    "siteName": "TEOCSite",
+    "incidentsList": "TEOC-IncidentTransaction",
+    "assessmentsList": "TEOC-Assessments",
+    "incStatusList": "TEOC-IncidentStatus",
+    "incTypeList": "TEOC-IncidentType",
+    "roleAssignmentList": "TEOC-RoleAssignments",
     "lists": [
         {
-            "listName": "Assessments",
+            "listName": "TEOC-Assessments",
             "columns": [
                 {
                     "name": "Contact Name",

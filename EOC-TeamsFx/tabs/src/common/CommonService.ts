@@ -141,14 +141,6 @@ export default class CommonService {
         return await graph.api(graphEndpoint).update(listItemObj);
     }
 
-    // get incident details based on incident name
-    public async getExistingIncident(graphEndpoint: any, graph: Client): Promise<any> {
-
-        return await graph.api(graphEndpoint)
-            .header('Prefer', 'HonorNonIndexedQueriesWarningMayFailRandomly')
-            .get();
-    }
-
     // create channel
     public async createChannel(graphEndpoint: any, graph: Client, channelObj: any): Promise<any> {
         return await graph.api(graphEndpoint).post(JSON.stringify(channelObj));
@@ -232,24 +224,22 @@ export default class CommonService {
         return inputRegexValidationObj;
     }
 
-    // get incident details based on incident name
-    getIncident = async (graphEndpoint: string, graphClient: any): Promise<boolean> => {
-        try {
-            const incDetails = await this.getExistingIncident(graphEndpoint, graphClient);
-            if (incDetails && incDetails.value.length > 0) {
-                // if incident with same name found, return true.
-                return true;
+    // get existing  members of the team
+    getExistingTeamMembers = async (graphEndpoint: string, graph: Client): Promise<any> => {
+        return new Promise(async (resolve, reject) => {
+
+            // const graphEndpoint = graphConfig.teamsGraphEndpoint + "/" + teamId + graphConfig.membersGraphEndpoint;
+            try {
+                const members = await this.getGraphData(graphEndpoint, graph);
+                resolve(members);
+            } catch (ex) {
+                console.error(
+                    constants.errorLogPrefix + "UpdateIncident_GetExistingTeamMembers \n",
+                    JSON.stringify(ex)
+                );
+                reject(ex);
             }
-            else {
-                return false;
-            }
-        } catch (error) {
-            console.error(
-                constants.errorLogPrefix + "GetIncident \n",
-                JSON.stringify(error)
-            );
-            return false;
-        }
+        });
     }
 
     //Log exception to App Insights

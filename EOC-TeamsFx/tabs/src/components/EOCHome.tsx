@@ -2,7 +2,7 @@ import React from 'react';
 import { TeamsUserCredential, createMicrosoftGraphClient } from "@microsoft/teamsfx";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { Providers, ProviderState, SimpleProvider } from '@microsoft/mgt-element';
-import { Button, Loader } from "@fluentui/react-northstar";
+import { Button, Loader, Dialog } from "@fluentui/react-northstar";
 import { MessageBar, MessageBarType, initializeIcons } from '@fluentui/react';
 import Dashboard from './Dashboard';
 import EocHeader from './EocHeader';
@@ -34,6 +34,11 @@ interface IEOCHomeState {
     currentUserId: string;
     loaderMessage: string;
     selectedIncident: any;
+    existingTeamMembers: any;
+    isOwner: boolean;
+    isEditMode: boolean,
+    showLoader: boolean,
+    showNoAccessMessage: boolean;
     userPrincipalName: any;
 }
 
@@ -72,6 +77,11 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
             currentUserId: "",
             loaderMessage: localeStrings.genericLoaderMessage,
             selectedIncident: [],
+            existingTeamMembers: [],
+            isOwner: false,
+            isEditMode: false,
+            showLoader: false,
+            showNoAccessMessage: false,
             userPrincipalName: null
         }
     }
@@ -255,21 +265,85 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
     }
 
     // changes state to show update incident form
-    private showEditForm = (incidentData: any) => {
-        this.setState({
-            showIncForm: true,
-            selectedIncident: incidentData
-        })
+    private showEditForm = async (incidentData: any) => {
+        this.hideMessageBar();
+        try {
+            this.setState({
+                showLoader: true
+            })
+            const teamGroupId = incidentData.teamWebURL.split("?")[1].split("&")[0].split("=")[1].trim();
+
+            // check if current user is owner of the team
+            await this.checkIfUserHasPermissionToEdit(teamGroupId);
+            this.setState({
+                showIncForm: true,
+                selectedIncident: incidentData
+            })
+        } catch (error) {
+
+        }
+    }
+
+    // check if the user is owner of the team
+    private checkIfUserHasPermissionToEdit = async (teamId: string): Promise<any> => {
+        let isOwner = false;
+        return new Promise(async (resolve, reject) => {
+            try {
+                const graphEndpoint = graphConfig.teamsGraphEndpoint + "/" + teamId + graphConfig.membersGraphEndpoint;
+                const existingMembers = await this.dataService.getExistingTeamMembers(graphEndpoint, this.state.graph);
+
+                existingMembers.value.forEach((members: any) => {
+                    if (members.roles.length > 0 && members.userId === this.state.currentUserId) {
+                        isOwner = true;
+                    }
+                });
+
+                if (isOwner) {
+                    this.setState({
+                        existingTeamMembers: existingMembers.value,
+                        isEditMode: true,
+                        showLoader: false,
+                        isOwner: isOwner,
+                        showNoAccessMessage: false
+                    })
+                }
+                else {
+                    this.setState({
+                        existingTeamMembers: existingMembers.value,
+                        isEditMode: true,
+                        isOwner: isOwner,
+                        showLoader: false,
+                        showNoAccessMessage: true
+                    })
+                }
+                resolve(isOwner);
+            } catch (error) {
+                this.setState({
+                    isOwner: isOwner,
+                    isEditMode: true,
+                    showLoader: false,
+                    showNoAccessMessage: true
+                })
+                reject(isOwner);
+            }
+        });
     }
 
     // changes state to show message bar and dashboard
     private handleBackClick = (showMessageBar: boolean) => {
         if (showMessageBar) {
-            this.setState({ showIncForm: false })
+            this.setState({ showIncForm: false, isEditMode: false })
         }
         else {
-            this.setState({ showIncForm: false, showMessageBar: false })
+            this.setState({ showIncForm: false, showMessageBar: false, isEditMode: false })
         }
+    }
+
+    // hide the message bar and reset the flags for unauthorized edit button click
+    private hideUnauthorizedMessage = () => {
+        this.setState({
+            showNoAccessMessage: false, showIncForm: false, showMessageBar: false, isEditMode: false
+        })
     }
 
     public render() {
@@ -321,34 +395,76 @@ export class EOCHome extends React.Component<IEOCHomeProps, IEOCHomeState>  {
                                         }
                                     </>
                                 }
-                                {!this.state.showIncForm ?
-                                    <Dashboard
-                                        graph={this.state.graph}
-                                        tenantName={this.state.tenantName}
-                                        siteId={this.state.siteId}
-                                        onCreateTeamClick={this.showNewForm}
-                                        onEditButtonClick={this.showEditForm}
-                                        localeStrings={localeStrings}
-                                        onBackClick={this.handleBackClick}
-                                        showMessageBar={this.showMessageBar}
-                                        hideMessageBar={this.hideMessageBar}
-                                        appInsights={appInsights}
-                                        userPrincipalName={this.state.userPrincipalName}
-                                    />
+                                {this.state.showLoader ?
+                                    <>
+                                        <Loader label={this.state.loaderMessage} size="largest" />
+                                    </>
                                     :
-                                    <IncidentDetails
-                                        graph={this.state.graph}
-                                        tenantName={this.state.tenantName}
-                                        siteId={this.state.siteId}
-                                        onBackClick={this.handleBackClick}
-                                        showMessageBar={this.showMessageBar}
-                                        hideMessageBar={this.hideMessageBar}
-                                        localeStrings={localeStrings}
-                                        currentUserId={this.state.currentUserId}
-                                        incidentData={this.state.selectedIncident}
-                                        appInsights={appInsights}
-                                        userPrincipalName={this.state.userPrincipalName}
-                                    />
+                                    <>
+                                        {!this.state.showIncForm ?
+                                            <Dashboard
+                                                graph={this.state.graph}
+                                                tenantName={this.state.tenantName}
+                                                siteId={this.state.siteId}
+                                                onCreateTeamClick={this.showNewForm}
+                                                onEditButtonClick={this.showEditForm}
+                                                localeStrings={localeStrings}
+                                                onBackClick={this.handleBackClick}
+                                                showMessageBar={this.showMessageBar}
+                                                hideMessageBar={this.hideMessageBar}
+                                                appInsights={appInsights}
+                                                userPrincipalName={this.state.userPrincipalName}
+                                            />
+                                            :
+                                            <>
+                                                {this.state.isEditMode ?
+                                                    <>
+                                                        {(this.state.isOwner && !this.state.showNoAccessMessage) ?
+                                                            <IncidentDetails
+                                                                graph={this.state.graph}
+                                                                tenantName={this.state.tenantName}
+                                                                siteId={this.state.siteId}
+                                                                onBackClick={this.handleBackClick}
+                                                                showMessageBar={this.showMessageBar}
+                                                                hideMessageBar={this.hideMessageBar}
+                                                                localeStrings={localeStrings}
+                                                                currentUserId={this.state.currentUserId}
+                                                                incidentData={this.state.selectedIncident}
+                                                                existingTeamMembers={this.state.existingTeamMembers}
+                                                                isEditMode={this.state.isEditMode}
+                                                                appInsights={appInsights}
+                                                                userPrincipalName={this.state.userPrincipalName}
+                                                            />
+                                                            :
+                                                            <Dialog
+                                                                confirmButton="Ok"
+                                                                content="You don't have access to modify the incident"
+                                                                header="No Access"
+                                                                onConfirm={(e) => this.hideUnauthorizedMessage()}
+                                                                open={this.state.showNoAccessMessage}
+                                                            />
+                                                        }
+                                                    </>
+                                                    :
+                                                    <IncidentDetails
+                                                        graph={this.state.graph}
+                                                        tenantName={this.state.tenantName}
+                                                        siteId={this.state.siteId}
+                                                        onBackClick={this.handleBackClick}
+                                                        showMessageBar={this.showMessageBar}
+                                                        hideMessageBar={this.hideMessageBar}
+                                                        localeStrings={localeStrings}
+                                                        currentUserId={this.state.currentUserId}
+                                                        incidentData={this.state.selectedIncident}
+                                                        existingTeamMembers={this.state.existingTeamMembers}
+                                                        isEditMode={this.state.isEditMode}
+                                                        appInsights={appInsights}
+                                                        userPrincipalName={this.state.userPrincipalName}
+                                                    />
+                                                }
+                                            </>
+                                        }
+                                    </>
                                 }
                             </div>
                         }

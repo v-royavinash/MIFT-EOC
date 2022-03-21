@@ -13,21 +13,21 @@
       "type": "string",
       "minLength": 1,
       "metadata": {
-        "description": "The m365 ClientId that will be provisioned."
+        "description": "The client Id of the Azure AD app, e.g., 123e4567-e89b-12d3-a456-426655440000."
       }
     },
     "ClientSecret": {
       "type": "string",
       "minLength": 1,
       "metadata": {
-        "description": "The m365 client secret that will be provisioned."
+        "description": "The client secret of the Azure AD app."
       }
     },
     "TenantId": {
       "type": "string",
       "minLength": 1,
       "metadata": {
-        "description": "The tenant Id."
+        "description": "The ID of the tenant to which the app will be deployed."
       }
     },
     "m365OauthAuthorityHost": {
@@ -72,14 +72,14 @@
       "metadata": {
         "description": "The URL to the GitHub repository to deploy."
       },
-      "defaultValue": "https://github.com/v-royavinash/fxrepo.git" //TODO :: To be updated later
+      "defaultValue": "https://github.com/OfficeDev/microsoft-teams-emergency-operations-center.git"
     },
     "gitBranch": {
       "type": "string",
       "metadata": {
         "description": "The branch of the GitHub repository to deploy."
       },
-      "defaultValue": "master"
+      "defaultValue": "main"
     }
   },
   "variables": {
@@ -270,7 +270,8 @@
       "apiVersion": "2020-10-01",
       "name": "addTeamsFxSimpleAuthConfiguration",
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'userAssignedIdentityProvision')]"
+        "[resourceId('Microsoft.Resources/deployments', 'userAssignedIdentityProvision')]",
+        "[resourceId('Microsoft.Resources/deployments', 'simpleAuthProvision')]"
       ],
       "properties": {
         "expressionEvaluationOptions": {
@@ -292,12 +293,6 @@
           },
           "m365OauthAuthorityHost": {
             "value": "[parameters('m365OauthAuthorityHost')]"
-          },
-          "identifierURI": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'frontendHostingProvision'), '2020-10-01').outputs.domain.value]"
-          },
-          "tabAppEndpoint": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'frontendHostingProvision'), '2020-10-01').outputs.endpoint.value]"
           }
         },
         "template": {
@@ -345,12 +340,6 @@
               "metadata": {
                 "description": "The base name to use for the resources that will be provisioned."
               }
-            },
-            "identifierURI": {
-              "type": "string"
-            },
-            "tabAppEndpoint": {
-              "type": "string"
             }
           },
           "variables": {
@@ -366,14 +355,16 @@
             "officeWebAppClientId2": "4765445b-32c6-49b0-83e6-1d93765276ca",
             "outlookDesktopAppClientId": "d3590ed6-52b3-4102-aeff-aad2292ab01c",
             "outlookWebAppClientId": "00000002-0000-0ff1-ce00-000000000000",
-            "authorizedClientApplicationIds": "[format('{0};{1};{2};{3};{4};{5}', variables('teamsMobileOrDesktopAppClientId'), variables('teamsWebAppClientId'), variables('officeWebAppClientId1'), variables('officeWebAppClientId2'), variables('outlookDesktopAppClientId'), variables('outlookWebAppClientId'))]"
+            "authorizedClientApplicationIds": "[format('{0};{1};{2};{3};{4};{5}', variables('teamsMobileOrDesktopAppClientId'), variables('teamsWebAppClientId'), variables('officeWebAppClientId1'), variables('officeWebAppClientId2'), variables('outlookDesktopAppClientId'), variables('outlookWebAppClientId'))]",
+            "identifierURI": "[concat(parameters('resourceBaseName'), '.azurewebsites.net')]",
+            "tabAppEndpoint": "[concat(parameters('resourceBaseName'), '.azurewebsites.net')]"
           },
           "resources": [
             {
               "type": "Microsoft.Web/sites/config",
               "apiVersion": "2021-02-01",
               "name": "[format('{0}/appsettings', variables('webAppName'))]",
-              "properties": "[createObject('AAD_METADATA_ADDRESS', variables('aadMetadataAddress'),'ALLOWED_APP_IDS', variables('authorizedClientApplicationIds'),'IDENTIFIER_URI', format('api://{0}/{1}', parameters('identifierURI'),parameters('ClientId')),'CLIENT_ID', variables('ClientId'),'CLIENT_SECRET', variables('ClientSecret'),'OAUTH_AUTHORITY',variables('oauthAuthority'), 'TAB_APP_ENDPOINT', parameters('tabAppEndpoint'),'WEBSITE_NODE_DEFAULT_VERSION','6.9.1')]"
+              "properties": "[createObject('AAD_METADATA_ADDRESS', variables('aadMetadataAddress'),'ALLOWED_APP_IDS', variables('authorizedClientApplicationIds'),'IDENTIFIER_URI', format('api://{0}/{1}', variables('identifierURI'),parameters('ClientId')),'CLIENT_ID', variables('ClientId'),'CLIENT_SECRET', variables('ClientSecret'),'OAUTH_AUTHORITY',variables('oauthAuthority'), 'TAB_APP_ENDPOINT', variables('tabAppEndpoint'),'WEBSITE_NODE_DEFAULT_VERSION','6.9.1')]"
             }
           ]
         }
@@ -438,7 +429,7 @@
               "value": "[reference(resourceId('Microsoft.Resources/deployments', 'simpleAuthProvision'), '2020-10-01').outputs.endpoint.value]"
             },
             {
-              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "name": "REACT_APP_APPINSIGHTS_INSTRUMENTATIONKEY",
               "value": "[reference(resourceId('Microsoft.Insights/components/', variables('appInsightsName')), '2015-05-01').InstrumentationKey]"
             },
             {

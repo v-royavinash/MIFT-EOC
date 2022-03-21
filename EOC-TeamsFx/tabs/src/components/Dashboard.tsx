@@ -39,7 +39,6 @@ export interface IDashboardState {
     filteredCompletedIncidents: any;
     searchText: string | undefined;
     isDesktop: boolean;
-    openUpdateIncidentPopup: boolean;
     showLoader: boolean;
     loaderMessage: string;
     selectedIncident: any;
@@ -71,7 +70,6 @@ class Dashboard extends React.PureComponent<IDashboardProps, IDashboardState> {
             filteredCompletedIncidents: [],
             searchText: "",
             isDesktop: true,
-            openUpdateIncidentPopup: false,
             showLoader: true,
             loaderMessage: this.props.localeStrings.genericLoaderMessage,
             selectedIncident: [],
@@ -86,14 +84,6 @@ class Dashboard extends React.PureComponent<IDashboardProps, IDashboardState> {
     // before unmounting, remove event listener
     componentWillUnmount() {
         window.removeEventListener("resize", this.resize.bind(this));
-    }
-
-    //Close Update Incident Popup
-    closeUpdateIncidentPopup = (isRefreshNeeded: boolean) => {
-        this.setState({ openUpdateIncidentPopup: false, selectedIncident: [] })
-        if (isRefreshNeeded) {
-            this.getDashboardData();
-        }
     }
 
     // bind edit icon to dashboard if status is not 'Completed'

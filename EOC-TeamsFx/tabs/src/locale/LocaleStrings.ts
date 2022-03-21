@@ -2,8 +2,8 @@ const localizedStrings = {
     "en-us": {
         btnLogin: "Login",
         // Header strings
-        appTitle: "Team Emergency Operation Center",
-        welcome: "Welcome User",
+        appTitle: "Microsoft Teams Emergency Operation Center",
+        welcome: "Welcome",
         moreInfo: "More Info",
         support: "Support",
         feedback: "Feedback",
@@ -25,6 +25,7 @@ const localizedStrings = {
         // Create Incident Strings
         back: "Back",
         formTitle: "Incident Form Details",
+        formTitleEditMode: "Update Incident",
         fieldIncidentName: "Incident Name",
         fieldIncidentStatus: "Incident Status",
         fieldDescription: "Description",
@@ -92,6 +93,9 @@ const localizedStrings = {
         btnClose: "Close",
         btnUpdateInc: "Update Incident",
         infoIncCommander: "Current user creating the incident and Incident Commander will both be added as owners to the Incident Team.",
+        saveIcon: "Save",
+        cancelIcon: "Cancel",
+        noMemberForRole: "Atleast one user must be present for the selected role!",
         // More Info callout
         aboutApp: "About the App",
         appDescription: "The Teams Emergency Operations Center was created after seeing the impact and value that standard and centralized Microsoft Teams creation could make when responding to an incident. This app template is created to help showcase and inspire new ways on how you can leverage the productivity tools of Microsoft 365 to quickly and efficiently respond in times of need.",
