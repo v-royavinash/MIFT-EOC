@@ -364,7 +364,7 @@
               "type": "Microsoft.Web/sites/config",
               "apiVersion": "2021-02-01",
               "name": "[format('{0}/appsettings', variables('webAppName'))]",
-              "properties": "[createObject('AAD_METADATA_ADDRESS', variables('aadMetadataAddress'),'ALLOWED_APP_IDS', variables('authorizedClientApplicationIds'),'IDENTIFIER_URI', format('api://{0}/{1}', variables('identifierURI'),parameters('ClientId')),'CLIENT_ID', variables('ClientId'),'CLIENT_SECRET', variables('ClientSecret'),'OAUTH_AUTHORITY',variables('oauthAuthority'), 'TAB_APP_ENDPOINT', variables('tabAppEndpoint'),'WEBSITE_NODE_DEFAULT_VERSION','6.9.1')]"
+              "properties": "[createObject('AAD_METADATA_ADDRESS', variables('aadMetadataAddress'),'ALLOWED_APP_IDS', variables('authorizedClientApplicationIds'),'IDENTIFIER_URI', format('api://{0}/{1}', variables('identifierURI'),parameters('ClientId')),'CLIENT_ID', variables('ClientId'),'CLIENT_SECRET', variables('ClientSecret'),'OAUTH_AUTHORITY',variables('oauthAuthority'), 'TAB_APP_ENDPOINT', format('https://{0}', variables('tabAppEndpoint')),'WEBSITE_NODE_DEFAULT_VERSION','6.9.1')]"
             }
           ]
         }
