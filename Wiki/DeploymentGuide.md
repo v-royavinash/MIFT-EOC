@@ -54,7 +54,7 @@ You need to first create a new Azure AD Application to secure API permissions. R
 ## 2. Deploy to your Azure subscription
 1. Click on the **Deploy to Azure** button below.
 
-    [![Deploy to Azure](images/DeployButton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fv-royavinash%2FMIFT-EOC%2Fmain%2FDeployment%2Fazuredeploy.json)
+    [![Deploy to Azure](images/DeployButton.png)](https%3A%2F%2Fportal.azure.com%2F%23create%2FMicrosoft.Template%2Furi%2Fhttps%3A%2F%2Fraw.githubusercontent.com%2FOfficeDev%2Fmicrosoft-teams-emergency-operations-center%2Fmain%2FDeployment%2Fazuredeploy.json)
 
 1. When prompted, log in to your Azure subscription.
 
@@ -158,3 +158,173 @@ You need to first create a new Azure AD Application to secure API permissions. R
     3. Click **Save** to commit your changes.
 
         ![Optional Claims](images/Manifest_Optional_Claims.png)
+
+## 4. Add Permissions to your Microsoft Graph Azure AD app
+
+In this section, you’ll be adding the necessary Graph API permissions to the application. 
+
+1. Select **API Permissions** blade from the left hand side.
+
+2. Click on **Add a permission** button to add permission to your app.
+
+3. In the fly out, click **Microsoft Graph**, then select **Delegated permissions** and enter the following permissions one by one,
+
+    1.  **Directory.AccessAsUser.All** 
+    2.  **Group.ReadWrite.All**
+    3.  **People.Read** 
+    4.  **Sites.Manage.All**
+    5.  **TeamMember.ReadWrite.All** 
+    6.  **TeamsTab.Create** 
+    7.  **TeamworkTag.ReadWrite** 
+    8.  **User.Read** 
+
+4. Click on **Add Permissions** to commit your changes. 
+5. Below is the description/reason for each permission granted above, 
+
+    1.  **Directory.AccessAsUser.All** : Allows the app to have the same access to information in the directory as the signed-in user. We are using this permission to access the Teams, SharePoint and Users information in the app. 
+    2.  **Group.ReadWrite.All** : Allows the app to create groups, read and update group memberships, and delete groups. Also allows the app to read and write calendars, conversations, files, and other group content for all groups. All these operations can be performed by the app without a signed-in user. We are using this permission to create a group when the incident is created.
+    3.  **People.Read** : Allows the app to read a scored list of people relevant to the signed-in user. The list can include local contacts, contacts from social networking or your organization's directory, and people from recent communications (such as email and Skype). We are using this permission for the “People Picker” fields to work (for ex. - Incident Commander and Role assinged user). 
+    4.  **Sites.Manage.All** : Allows the app to manage and create lists, documents, and list items in all site collections on behalf of the signed-in user. We use this permission to create the lists in the site created for each incident.
+    5.  **TeamMember.ReadWrite.All** : Add and remove members from teams, on behalf of the signed-in user. Also allows changing a member's role, for example from owner to non-owner. This permission is used to update the teams' membership when updating a role. 
+    6.  **TeamsTab.Create** : Allows the app to create tabs in any team in Microsoft Teams, on behalf of the signed-in user. This does not grant the ability to read, modify or delete tabs after they are created, or give access to the content inside the tabs. This is used to create the tabs in the team created for the incident. 
+    7.  **TeamworkTag.ReadWrite** :  Allows the app to read and write tags in Teams without a signed-in user. We are using this permission to create and update the tags which gets created along with the incident. 
+    8.  **User.Read** : Allows users to sign-in to the app and allows the app to read the profile of signed-in users. It also allows the app to read basic company information of signed-in users. This is used to get the current user details in the app. 
+
+5. Reach out to your IT admin team to grant consent for the permissions provided. If you’re an admin, click on Grant the admin Consent for ******* 
+
+    ![API Permissions](images/Api_Permissions.PNG)
+
+## 5. Create the Teams app packages
+
+Now we build the teams package to upload the TEOC (Teams Emergency Operations Center) app to the Teams client. TEOC intern will connect to the SharePoint resources/list to the Tenant deployed. 
+
+To create the team's package, 
+
+1. Make sure you have cloned the app [repository](https://github.com/OfficeDev/microsoft-teams-emergency-operations-center.git) locally.
+
+2. Open the `Deployment\appPackage\manifest.json` file in a text editor.
+3. Change the placeholder fields in the manifest to values appropriate for your organization. Please provide a valid URL in `https://****.**/` format.
+    
+    * `"websiteUrl":"<<Organization URL>>"`
+    * `"privacyUrl": "<<Organization privacy URL>>"`
+    * `"termsOfUseUrl":"<<Organization terms of use URL>>"`
+
+    
+    Change the `<<appDomain>>` placeholder in the below setting to be the `%appDomain%`.
+    
+    Example,
+    
+    * `"configurationUrl": "https://<<appDomain>>/index.html#/config"`
+    * `"contentUrl": "https://<<appDomain>>/index.html#/tab"`
+    * `"websiteUrl": "https://<<appDomain>>/index.html#/tab"`
+
+    ![Manifest Updates](images/Manifest_Placeholders.PNG)
+3. Update the validDomains and webApplicationInfo details.
+
+    * Change the `<<clientId>>` placeholder in the clientId setting to be the `%clientId%` value. This is the same GUID that you entered in the template at which we copied in step 1.
+
+    * Change the `<<appDomain>>` placeholder in the `webApplicationInfo` and `validDomains` and setting to be the `%appDomain%`value.  
+
+    ```
+      "validDomains": [ 
+            "<<appDomain>>" 
+        ], 
+    ```
+    ```
+        "webApplicationInfo": { 
+            "id": "<<clientId>>", 
+            "resource": "api://<<appDomain>>/<<clientId>>" 
+        } 
+     ```
+
+    ![Manifest Updates](images/Manifest_Placeholders_2.PNG)
+
+4. Create a ZIP package with the manifest.json and resources folder with color.png, and outline.png. The two image files are the icons for your app in Teams.
+
+    * Name this package `teoc.zip`, so you know that this is the app for the TEOC teams. 
+
+    * Make sure that the files are the top level of the ZIP package, with no nested folders. 
+    
+    ![Zip Folder Structure](images/Zip_Folder_Structure.PNG)
+
+## 6. Provisioning EOC Site
+
+To provision, the EOC site, and SharePoint lists, 
+
+1. Make sure you have cloned the app [repository](https://github.com/OfficeDev/microsoft-teams-emergency-operations-center.git) locally.
+
+2. Open the `Deployment/provisioning` folder to get the latest provisioning files i.e `EOC-Provision.ps1` and `EOC-SiteTemplate.xml`
+
+![Provisioning Scripts](images/Provisioning_Scripts.PNG)
+
+Below are the steps you need to perform to provision the EOC site –  
+
+1. Run the PowerShell script as Administrator, it will ask for below inputs –   
+
+    
+    * XML file path – enter fully qualified path of the XML file (e.g.- C:/Scripts/EOC-SiteTemplate.xml) 
+    * Tenant Name – Name of the tenant where root EOC site needs to be provisioned (e.g. -Contoso)
+    * Tenant Admin Email – Email of tenant admin account (e.g. – `abc@contoso.com`)  
+
+2. Once the above details are provided, script will check if the “PnP.PowerShell” module is installed, if not, it will install the module.
+3. If you are running the “PnP.PowerShell” scripts for the first time for that tenant, it will ask for a list of permissions to be granted. `“PnP.PowerShell”` module requests for all the permissions that are there even if it is not used in the script to ensure smooth running of the scripts. These are delegated permissions so only if the user running the script has permission to perform the action, script will be executed successfully.
+
+4. Below is the list of permissions it asks -
+
+    ![PnP Permissions](images/PnP_Permissions.PNG)
+
+Only SharePoint related permission “Have full control of all site collections” will be utilized in the script so that site can be provisioned.  
+
+
+## 7. Install the apps in Microsoft Teams
+
+Upload the app (the teoc.zip package) to Teams. 
+
+1. If your tenant has sideloading apps enabled, you can install your app by following the instructions [here](https://docs.microsoft.com/en-us/microsoftteams/platform/concepts/apps/apps-upload#load-your-package-into-teams) 
+
+2. You can also upload it to your tenant's app catalog so that it can be available for everyone in your tenant to install. See [here](https://docs.microsoft.com/en-us/microsoftteams/tenant-apps-catalog-teams) 
+
+**Note**: Please review [app permission policies](https://docs.microsoft.com/en-us/microsoftteams/teams-app-permission-policies) to allow access to the app
+
+## 8. Deploy “NotifyToTeams” Extension in SharePoint
+
+To get the latest package for extension, make sure you have cloned the app [repository](https://github.com/OfficeDev/microsoft-teams-emergency-operations-center.git) locally.  
+
+Get the latest package file `“eoc-extension.sppkg”` under **EOC-Extensions/sharepoint/ solution** folder.  
+
+![Extension Package](images/Extension_Package.PNG)
+
+Below are the steps you need to perform to add “NotifyToTeams” extension in EOC site –  
+
+
+1. Open SharePoint admin centre.
+
+    ![SharePoint Admin Center](images/SharePoint_Admin_Center.PNG)
+
+2. Click on "More features" menu item. Locate the Apps section and click the Open button.
+
+    ![SharePoint More Features](images/SharePoint_More_Features.PNG)
+
+3. Click on ‘App Catalog’ link. 
+
+    ![App Catalog](images/App_Catalog.PNG)
+
+4. Click the Distribute apps for SharePoint link.
+
+    ![Distribute Apps](images/Distribute_Apps.PNG)
+
+5. Click the New menu item.
+
+    ![PnP Permissions](images/SharePoint_More_Features.PNG)
+
+6. Click the Choose Files button, select the eoc-extension.sppkg file you downloaded 	or created earlier, and click on OK.
+
+    ![Extension Upload Package](images/Extension_Upload_Package.PNG)
+
+7. A confirmation dialog is displayed. Ensure the checkbox for "Make this solution 	available to all sites in the organization" is chosen and click Deploy.
+
+    ![Extension Deployment Confirmation](images/Extension_Deployment_Confirmation.PNG) 
+
+8. Return to the SharePoint admin center. Under expand the Advanced menu in the 	left navigation and select API access. Select and approve all pending requests 		associated with eoc-extension.
+
+    ![Extension API Permission](images/Extension_API_Permission.PNG)
