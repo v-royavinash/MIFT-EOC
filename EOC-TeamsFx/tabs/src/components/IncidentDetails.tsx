@@ -947,10 +947,13 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                 await this.createTagObject(this.state.teamGroupId, roles);
                             }
 
-                            if (usersObj.newAddedUsersForTags.length > 0) {
-                                tagsList = await this.getAllTags();
-                                await this.addUsersToTag(usersObj.newAddedUsersForTags, tagsList.value, false);
-                            }
+                            const usersForTags: any = [];
+                            this.state.roleAssignments.forEach(roles => {
+                                roles.userDetailsObj.forEach(users => {
+                                    usersForTags.push({ role: roles.role, userId: users.userId });
+                                })
+                            })
+                            await this.addUsersToTag(usersForTags, tagsList.value, false);
 
                             if (this.state.existingIncCommander.userId !== this.state.incDetailsItem.incidentCommander.userId) {
                                 // add incident commander to tag

@@ -65,6 +65,7 @@ export default class EocHeader extends Component<IHeaderProps, HeaderState> {
                                 title={this.props.localeStrings.appTitle}
                             />
                             <span className="header-text" title={this.props.localeStrings.appTitle}>{this.props.localeStrings.appTitle}</span>
+                            <span className="header-text-preview" title={this.props.localeStrings.appTitlePreview}>{this.props.localeStrings.appTitlePreview}</span>
                         </Flex>
                         <Flex gap={this.state.isDesktop ? "gap.large" : "gap.medium"} vAlign="center">
                             <FlexItem>

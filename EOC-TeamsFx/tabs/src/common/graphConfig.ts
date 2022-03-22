@@ -25,21 +25,11 @@ export const addMembersGraphEndpoint = "/members/add";
 export const addUsersGraphEndpoint = "https://graph.microsoft.com/v1.0/users";
 export const scope = [
     "User.Read",
-    "User.ReadBasic.All",
-    "User.Read.All",
-    "Sites.Read.All",
-    "Sites.ReadWrite.All",
     "Sites.Manage.All",
     "People.Read",
-    "GroupMember.Read.All",
-    "Group.Read.All",
     "Group.ReadWrite.All",
-    "TeamMember.Read.All",
     "TeamMember.ReadWrite.All",
-    "Directory.ReadWrite.All",
-    "Directory.AccessAsUser.All",
     "TeamsTab.Create",
-    "TeamsTab.ReadWrite.All",
-    "TeamsTab.ReadWriteForTeam",
-    "TeamworkTag.ReadWrite"
+    "TeamworkTag.ReadWrite",
+    "Directory.AccessAsUser.All"
 ]

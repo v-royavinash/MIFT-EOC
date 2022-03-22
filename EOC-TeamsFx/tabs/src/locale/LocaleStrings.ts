@@ -3,6 +3,7 @@ const localizedStrings = {
         btnLogin: "Login",
         // Header strings
         appTitle: "Microsoft Teams Emergency Operation Center",
+        appTitlePreview: "(Preview)",
         welcome: "Welcome",
         moreInfo: "More Info",
         support: "Support",
@@ -106,7 +107,7 @@ const localizedStrings = {
         currentVersion: "Current Version",
         latestVersion: "Latest Version",
         githubLabel: "Github",
-        eocPage: "Visit the Emergency Operations Center pages to learn more:",
+        eocPage: "Visit the Teams Emergency Operations Center pages to learn more:",
         overview: "Overview & Information on our",
         msAdoptionHubLink: "Microsoft Adoption Hub",
         solutionLink: "Solution technical documentation and architectural overview on"
