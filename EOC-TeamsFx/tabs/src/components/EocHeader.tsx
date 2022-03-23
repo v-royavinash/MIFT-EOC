@@ -59,7 +59,7 @@ export default class EocHeader extends Component<IHeaderProps, HeaderState> {
                     <Flex gap="gap.small" space='between'>
                         <Flex gap="gap.small" vAlign="center">
                             <img
-                                src={require("../assets/Images/MsLogo.svg").default}
+                                src={require("../assets/Images/AppLogo.svg").default}
                                 alt="Ms Logo"
                                 className="ms-logo"
                                 title={this.props.localeStrings.appTitle}
