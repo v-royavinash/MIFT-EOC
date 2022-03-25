@@ -1,5 +1,5 @@
 # Microsoft Teams Emergency Operation Center
 
-Microsoft Teams Emergency Operations Center (TEOC) was created after seeing the impact and value that standard and centralized Microsoft Teams creation could make when responding to an incident. This app template is created to help showcase and inspire new ways on how you can leverage the productivity tools of Microsoft 365 to quickly and efficiently respond in times of need.
+The Microsoft Teams Emergency Operations Center (TEOC) solution template leverages the power of the Microsoft 365 platform to centralize incident response, information sharing and field communications using powerful services like Microsoft Lists, SharePoint and more. An open-source solution supported by Microsoft. it provides core functionality out of the box or can be extended to meet specific agency requirements.
 
 ![TEOC Screen](./Images/Dashboard.png)   

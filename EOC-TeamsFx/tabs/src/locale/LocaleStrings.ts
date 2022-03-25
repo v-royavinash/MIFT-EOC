@@ -99,7 +99,7 @@ const localizedStrings = {
         noMemberForRole: "Atleast one user must be present for the selected role!",
         // More Info callout
         aboutApp: "About the App",
-        appDescription: "The Teams Emergency Operations Center was created after seeing the impact and value that standard and centralized Microsoft Teams creation could make when responding to an incident. This app template is created to help showcase and inspire new ways on how you can leverage the productivity tools of Microsoft 365 to quickly and efficiently respond in times of need.",
+        appDescription: "The Microsoft Teams Emergency Operations Center (TEOC) solution template leverages the power of the Microsoft 365 platform to centralize incident response, information sharing and field communications using powerful services like Microsoft Lists, SharePoint and more. An open-source solution supported by Microsoft it provides core functionality out of the box or can be extended to meet specific agency requirements.",
         headerAdditionalResource: "Additional Resources",
         bodyAdditionalResource: "The Teams Customer Advocacy Group is focused on delivering solutions like these to inspire and help you achieve your goals. Follow and join in these other resources to learn more from us and the community:",
         msPublicSector: "Public Sector on the Microsoft Technical Community",
@@ -110,7 +110,8 @@ const localizedStrings = {
         eocPage: "Visit the Teams Emergency Operations Center pages to learn more:",
         overview: "Overview & Information on our",
         msAdoptionHubLink: "Microsoft Adoption Hub",
-        solutionLink: "Solution technical documentation and architectural overview on"
+        solutionLink: "Solution technical documentation and architectural overview on",
+        infoIncName: "Special Characters & and # are not allowed in Incident Name.",
     }
 }
 export { localizedStrings };

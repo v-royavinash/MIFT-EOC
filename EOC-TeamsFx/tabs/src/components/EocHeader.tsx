@@ -64,8 +64,7 @@ export default class EocHeader extends Component<IHeaderProps, HeaderState> {
                                 className="ms-logo"
                                 title={this.props.localeStrings.appTitle}
                             />
-                            <span className="header-text" title={this.props.localeStrings.appTitle}>{this.props.localeStrings.appTitle}</span>
-                            <span className="header-text-preview" title={this.props.localeStrings.appTitlePreview}>{this.props.localeStrings.appTitlePreview}</span>
+                            <span className="header-text" title={this.props.localeStrings.appTitle}>{this.props.localeStrings.appTitle} <span className="header-text-preview" title={this.props.localeStrings.appTitlePreview}>{this.props.localeStrings.appTitlePreview}</span> </span>
                         </Flex>
                         <Flex gap={this.state.isDesktop ? "gap.large" : "gap.medium"} vAlign="center">
                             <FlexItem>
@@ -139,13 +138,13 @@ export default class EocHeader extends Component<IHeaderProps, HeaderState> {
                         <Text block variant="small" className="info-titlebody">
                             {this.props.localeStrings.bodyAdditionalResource}
                         </Text>
-                        <Text block variant="xLarge" className="info-titlelink">
+                        <Text block variant="xLarge" className="info-title">
                             {this.props.localeStrings.msPublicSector}
                         </Text>
                         <Link href={constants.msPublicSectorUrl} target="_blank" className="info-link">
                             {constants.msPublicSectorUrl}
                         </Link>
-                        <Text block variant="xLarge" className="info-titlelink">
+                        <Text block variant="xLarge" className="info-title">
                             {this.props.localeStrings.drivingAdoption}
                         </Text>
                         <Link href={constants.drivingAdoptionUrl} target="_blank" className="info-link">

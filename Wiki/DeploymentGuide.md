@@ -29,9 +29,9 @@ To begin deployment for Microsoft Teams Emergency Operations Center (TEOC) appli
 
 ## 1. Register Azure AD application
 
-You need to first create a new Azure AD Application to secure API permissions. Registering your application establishes a trust relationship between your app and the Microsoft identity platform.
+You need to first create a new Azure AD Application to secure API permissions. Registering your application establishes a trust relationship between your app and the Microsoft identity platform. 
 
-1. Log in to the Azure Portal using SharePoint Tenant account, and go to the [App registrations](https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps) blade.
+1. Log in to the Azure Portal using SharePoint Tenant account where you want the app to be installed, and go to the [App registrations](https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps) blade.
 
 1. Click **New registration** to create an Azure AD application.
     - **Name**: Name of your Teams App.
@@ -47,11 +47,11 @@ You need to first create a new Azure AD Application to secure API permissions. R
 
 1. On the side rail in the Manage section, navigate to the "Certificates & secrets" section. In the Client secrets section, click on "+ New client secret". Add a description for the secret, and choose when the secret needs to expire (recommended is 12 months) and click "Add".
 
-1. Once the client secret is created, copy its **Value**; we will need it later. Once you leave this page, you may not be able to copy it again.
+1. Once the client secret is created, copy its **Value** only; we will need it later. Once you leave this page, you may not be able to copy it again.
 
     ![Azure AD app secret](images/App_Secret.png)
 
-1. You're done with app registration and client secrets for now. This provides the groundwork for our next steps. Please ensure you have the values ready for Application Id, Tenant Id, Client Secret.
+1. You're done with app registration and client secrets for now. This provides the groundwork for our next steps. Please ensure you have the values ready for Application Id, Tenant Id, Client Secret Value.
 
 ## 2. Deploy to your Azure subscription
 1. Click on the **Deploy to Azure** button below.
@@ -61,8 +61,6 @@ You need to first create a new Azure AD Application to secure API permissions. R
 1. When prompted, log in to your Azure subscription.
 
 1. Azure will create a "Custom deployment" based on the TEOC ARM template with pre-filled values.
-
-    > **Note:** Please ensure that you use numbers and lower case in any of the field values otherwise the deployment may fail.
 
 1. Select a subscription and a resource group.
    * We recommend creating a new resource group.
@@ -75,9 +73,11 @@ You need to first create a new Azure AD Application to secure API permissions. R
    * The `[Base Resource Name]` must be unique and available. For example, if you select `contosoteoc` as the base name, the name `contosoteoc` must be available (not taken); otherwise, the deployment will fail with a Conflict error.
    * Remember the base resource name that you selected. We will need it later.
 
+   > **Note:** Please ensure that you use lower case and numbers in the field you enter, otherwise the deployment may fail.
+
 1. Update the following fields in the template using the values copied from step 1 in previous section,
     1. **Client ID**: The application (client) ID of the app registered
-    2. **User Client Secret**: The client secret of the app registered
+    2. **Client Secret**: The client secret Value of the app registered
     3. **Tenant Id**: The tenant Id
 
 1. Other fields have pre-populated default values, do not change it unless you want it to be customized depending on the need.
@@ -91,16 +91,16 @@ You need to first create a new Azure AD Application to secure API permissions. R
 1. Go to **App Registrations** page [here](https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps) and select the application (TEOC specific) which you created in step 1. Follow the below steps to set up the authentication for the application.
 
     > Note: For following steps you need to use **appDomain** convention for the app service URL.
-    - appDomain is the App service URL without https:// or <<**resourceBaseName**>>.azurewebsites.net
+    - appDomain is the App service URL without https:// or <<**baseResourceName**>>.azurewebsites.net
 
 1. Under **Manage**, click on **Authentication** to bring up authentication settings.
 
     1. Click on **Add a Platform**. Select Web and add Redirect URIs in below format:
-        - **Redirect URI**: Enter `https://%appDomain%/auth-end.html` for the URL (Ex: `https://<<resourceBaseName>>.azurewebsites.net/auth-end.html`)
+        - **Redirect URI**: Enter `https://%appDomain%/auth-end.html` for the URL (Ex: `https://<<baseResourceName>>.azurewebsites.net/auth-end.html`)
 
     1. Click on **Add a Platform**. Select Single-page application and add Redirect URIs in below format:
-        - **Redirect URI**: Enter `https://%appDomain%/auth-end.html?clientId= %value%` for the URL (Ex: `https://<<resourceBaseName>>.azurewebsites.net/auth-end.html?clientId=<<Client Id Value>>`)
-        - Click on Add URI and add another entry as, `https://%appDomain%/blank-auth-end.html` (Ex: `https://<<resourceBaseName>>.azurewebsites.net/blank-auth-end.html`)     
+        - **Redirect URI**: Enter `https://%appDomain%/auth-end.html?clientId= %clientId%` for the URL (Ex: `https://<<baseResourceName>>.azurewebsites.net/auth-end.html?clientId=<<Client Id>>`)
+        - Click on Add URI and add another entry as, `https://%appDomain%/blank-auth-end.html` (Ex: `https://<<baseResourceName>>.azurewebsites.net/blank-auth-end.html`)     
 
     1. Click **Save** to commit your changes.
 
@@ -108,7 +108,7 @@ You need to first create a new Azure AD Application to secure API permissions. R
 
     1. Back under **Manage**, click on **Expose an API**.
 
-    1. Click on the **Set** link next to **Application ID URI**, and change the value to `api://%appDomain%/%clientId%` (Ex: `api://<<resourceBaseName>>.azurewebsites.net/<<Client Id Value>>`.
+    1. Click on the **Set** link next to **Application ID URI**, and change the value to `api://%appDomain%/%clientId%` (Ex: `api://<<baseResourceName>>.azurewebsites.net/<<Client Id>>`.
 
     1. Click **Save** to commit your changes.
 
@@ -203,7 +203,18 @@ To provision the TEOC site and SharePoint lists,
 * Make sure you have cloned the app [repository](https://github.com/OfficeDev/microsoft-teams-emergency-operations-center.git) locally.
 * Open the `Deployment/provisioning` folder to get the latest provisioning files i.e `EOC-Provision.ps1` and `EOC-SiteTemplate.xml`
 
-![Provisioning Scripts](images/Provisioning_Scripts.PNG)
+    ![Provisioning Scripts](images/Provisioning_Scripts.PNG)
+
+* Run the below command, this will allow you to run **EOC-Provision.ps1** script. By default, the execution policy is restricted. You may change it back to restricted after deployment is completed.
+    ```
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+    ```
+
+* Run the below command to unblock the deployment script.
+
+    ```
+    Unblock-File -Path .\EOC-Provision.ps1
+    ```
 
 Below are the steps you need to perform to provision the TEOC site,  
 
@@ -232,12 +243,6 @@ To create the team's package,
 1. Make sure you have cloned the app [repository](https://github.com/OfficeDev/microsoft-teams-emergency-operations-center.git) locally.
 
 2. Open the `Deployment\appPackage\manifest.json` file in a text editor.
-
-3. Change the placeholder fields in the manifest to values appropriate for your organization. Please provide a valid URL in `https://****.**/` format.
-    
-    * `"websiteUrl":"<<Organization URL>>"`
-    * `"privacyUrl": "<<Organization privacy URL>>"`
-    * `"termsOfUseUrl":"<<Organization terms of use URL>>"`
     
 4. Change the `<<appDomain>>` placeholder in the below setting to your app domain URL, for example    
         
@@ -249,7 +254,7 @@ To create the team's package,
 
 3. Update the validDomains and webApplicationInfo details.
 
-    * Change the `<<clientId>>` placeholder in the clientId setting to be the _%clientId%_ value. This is the same GUID that you entered in the template at which we copied in step 1.
+    * Change the `<<clientId>>` placeholder in the webApplicationInfo setting with the _%clientId%_. This is the application id which we copied in step 1.
 
     * Change the `<<appDomain>>` placeholder in the _webApplicationInfo_ and _validDomains_ to the `%appDomain%` value.  
 

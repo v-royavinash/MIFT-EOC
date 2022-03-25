@@ -192,6 +192,10 @@
         padding-left: 3px;
     }   
 
+    .incNameInfoIcon {
+        padding-left: 3px;
+    }
+
     .role-edit-icon {
         font-size: 22px;
         color: #979593;
@@ -269,6 +273,15 @@ div[class="incident-details"] {
             label::after {
                 content: " *";
                 color: #FF0000;
+            }
+
+            label[class="FormInput-label"] {
+                margin-bottom: 0.25rem;
+            }
+
+            label[class="FormInput-label"]::after {
+                content: " *";
+                color: #FF0000
             }
 
             label[class="people-picker-label"] {

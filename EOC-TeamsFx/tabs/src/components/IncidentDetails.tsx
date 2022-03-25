@@ -1764,7 +1764,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     "teamsApp@odata.bind": graphConfig.assessmentTabTeamsAppIdGraphEndpoint,
                     "configuration": {
                         "entityId": uuidv4(),
-                        "contentUrl": `${site_base_url}/_layouts/15/listallitems.aspx?listUrl=/sites/${site_name}/Lists/Assessments&app=teamslist&v=2`,
+                        "contentUrl": `${site_base_url}/_layouts/15/teamslogon.aspx?spfx=true&dest=/sites/${site_name}/Lists/${siteConfig.lists[0].listURL}/AllItems.aspx`,
                         "removeUrl": null,
                         "websiteUrl": null
                     }
@@ -1810,7 +1810,7 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                     "teamsApp@odata.bind": graphConfig.newsTabTeamsAppIdGraphEndpoint,
                     "configuration": {
                         "entityId": uuidv4(),
-                        "contentUrl": `${siteBaseURL}${team_info.mailNickname}/_layouts/15/news.aspx`,
+                        "contentUrl": `${siteBaseURL}${team_info.mailNickname}/_layouts/15/teamslogon.aspx?spfx=true&dest=/sites/${team_info.mailNickname}/_layouts/15/news.aspx`,
                         "removeUrl": null,
                         "websiteUrl": `${siteBaseURL}${team_info.mailNickname}/_layouts/15/news.aspx`
                     }
@@ -2115,8 +2115,15 @@ class IncidentDetails extends React.PureComponent<IIncidentDetailsProps, IIncide
                                     <Row xs={1} sm={2} md={3}>
                                         <Col md={4} sm={8} xs={12}>
                                             <div className="incident-grid-item">
+                                                <label className="FormInput-label">{this.props.localeStrings.fieldIncidentName}</label>
+                                                <TooltipHost
+                                                    content={this.props.localeStrings.infoIncName}
+                                                    calloutProps={calloutProps}
+                                                    styles={hostStyles}
+                                                >
+                                                    <Icon aria-label="Info" iconName="Info" className="incNameInfoIcon" />
+                                                </TooltipHost>
                                                 <FormInput
-                                                    label={this.props.localeStrings.fieldIncidentName}
                                                     type="text"
                                                     placeholder={this.props.localeStrings.phIncidentName}
                                                     fluid={true}
